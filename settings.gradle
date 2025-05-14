@@ -1,0 +1,7 @@
+rootProject.name = 'DPS-DESM'
+include 'renewable-provider'
+include 'power-plant'
+include 'administration-client'
+include 'administration-server'
+include 'common'
+

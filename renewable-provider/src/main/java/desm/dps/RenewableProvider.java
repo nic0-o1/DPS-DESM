@@ -5,7 +5,7 @@ public class RenewableProvider {
 
     private final RequestGenerator requestGenerator;
     private final EnergyRequestPublisher requestPublisher;
-    private volatile boolean running = false; // Use volatile for visibility
+    volatile boolean running = false; // Use volatile for visibility
     private Thread providerThread;
 
     public RenewableProvider(){

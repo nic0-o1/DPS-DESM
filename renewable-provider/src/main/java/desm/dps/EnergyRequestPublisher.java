@@ -24,10 +24,7 @@ public class EnergyRequestPublisher {
             options.setCleanSession(true);
             client.connect(options);
 
-            client.connect(options);
-
             System.out.println("Renewable Provider connected to MQTT broker at " + MQTT_BROKER_URL);
-
 
         }
         catch (MqttException e) {

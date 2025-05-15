@@ -36,7 +36,7 @@ public class EnergyRequestPublisher {
         }
     }
 
-    public void PublishRequest(EnergyRequest energyRequest) {
+    public void publishRequest(EnergyRequest energyRequest) {
         if (client == null || !client.isConnected()) {
             System.err.println("MQTT client not connected. Cannot publish message.");
             return;

@@ -1,5 +1,8 @@
 plugins {
     id 'java'
+
+    id 'io.spring.dependency-management' version '1.0.15.RELEASE'
+    id 'org.springframework.boot' version '3.4.5'
 }
 
 group = 'desm.dps'
@@ -10,8 +13,14 @@ repositories {
 }
 
 dependencies {
+    //REST
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+
+    implementation project(':common')
+
 }
 
 test {

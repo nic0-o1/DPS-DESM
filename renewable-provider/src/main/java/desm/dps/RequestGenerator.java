@@ -1,5 +1,6 @@
 package desm.dps;
 
+import java.sql.Timestamp;
 import java.util.Random;
 import java.util.UUID;
 
@@ -12,7 +13,7 @@ public class RequestGenerator {
     public EnergyRequest generateRequest() {
         String requestId = UUID.randomUUID().toString(); // Unique ID for the request
         int amountKWh = random.nextInt(MAX_AMOUNT_KWH - MIN_AMOUNT_KWH + 1) + MIN_AMOUNT_KWH;
-        long timestamp = System.currentTimeMillis(); // Current timestamp
+        String timestamp = new Timestamp(System.currentTimeMillis()).toString();
 
         return new EnergyRequest(requestId, amountKWh, timestamp);
     }

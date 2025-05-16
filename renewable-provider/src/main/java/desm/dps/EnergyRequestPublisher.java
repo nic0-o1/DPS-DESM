@@ -40,18 +40,17 @@ public class EnergyRequestPublisher {
         }
 
         try {
-            // Convert EnergyRequest object to JSON string
             String jsonRequest = objectMapper.writeValueAsString(energyRequest);
             MqttMessage message = new MqttMessage(jsonRequest.getBytes(StandardCharsets.UTF_8));
-            message.setQos(2); // Quality of Service 1: At least once delivery
-            message.setRetained(true); // Retain the message so new subscribers get the last request
+            message.setQos(2);
+            message.setRetained(true);
 
             client.publish(ENERGY_REQUEST_TOPIC, message);
             System.out.println("Published energy request: " + energyRequest);
         } catch (MqttException e) {
             System.err.println("Error publishing MQTT message: " + e.getMessage());
             e.printStackTrace();
-            // Handle publish error
+
         } catch (Exception e) {
             System.err.println("Error serializing or publishing message: " + e.getMessage());
             e.printStackTrace();

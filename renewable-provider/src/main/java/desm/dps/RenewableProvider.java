@@ -5,7 +5,7 @@ public class RenewableProvider {
 
     private final RequestGenerator requestGenerator;
     private final EnergyRequestPublisher requestPublisher;
-    volatile boolean running = false; // Use volatile for visibility
+    volatile boolean running = false;
     private Thread providerThread;
 
     public RenewableProvider(){
@@ -26,12 +26,10 @@ public class RenewableProvider {
                     EnergyRequest request = requestGenerator.generateRequest();
                     requestPublisher.publishRequest(request);
 
-                    // Wait for the specified interval
                     Thread.sleep(PUBLISH_INTERVAL_MS);
 
                 } catch (InterruptedException e) {
                     System.out.println("Renewable Provider thread interrupted.");
-                    // Restore the interrupt flag
                     Thread.currentThread().interrupt();
                     running = false; // Stop the loop on interruption
                 } catch (Exception e) {
@@ -53,12 +51,10 @@ public class RenewableProvider {
         System.out.println("Stopping Renewable Provider...");
         running = false; // Signal the thread to stop
 
-        // Interrupt the thread to wake it up from sleep if it's waiting
         if (providerThread != null) {
             providerThread.interrupt();
         }
 
-        // Optionally, wait for the thread to finish (join)
         try {
             if (providerThread != null) {
                 providerThread.join();

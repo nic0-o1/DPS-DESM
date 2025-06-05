@@ -4,10 +4,10 @@ public class EnergyRequest {
 
     private String requestID;
     private int amountKWh;
-    private String timestamp;
+    private Long timestamp;
 
     public EnergyRequest() {}
-    public EnergyRequest(String requestID, int amountKWh, String timestamp) {
+    public EnergyRequest(String requestID, int amountKWh, Long timestamp) {
         this.requestID = requestID;
         this.amountKWh = amountKWh;
         this.timestamp = timestamp;
@@ -15,7 +15,7 @@ public class EnergyRequest {
 
     public String getRequestID() { return requestID; }
     public int getAmountKWh() { return amountKWh; }
-    public String getTimestamp() { return timestamp; }
+    public Long getTimestamp() { return timestamp; }
 
     @Override
     public String toString() {

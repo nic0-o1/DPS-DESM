@@ -1,28 +1,42 @@
 package desm.dps;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Scanner;
 
 public class RenewableProviderApp {
+    // Logger for tracing application lifecycle events
+    private static final Logger logger = LoggerFactory.getLogger(RenewableProviderApp.class);
+
     public static void main(String[] args) {
-        System.out.println("Starting Renewable Provider Application...");
+        logger.info("Starting Renewable Provider Application...");
         RenewableProvider provider = new RenewableProvider();
 
+        // Start the provider (establish connections, begin publishing, etc.)
         provider.start();
+        logger.info("RenewableProvider started.");
 
+        // Add a shutdown hook to ensure the provider stops cleanly if the JVM is terminated
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            System.out.println("Shutdown hook activated. Stopping provider...");
+            logger.info("Shutdown hook triggered. Stopping RenewableProvider...");
             provider.stop();
-            System.out.println("Provider stopped by shutdown hook.");
+            logger.info("RenewableProvider stopped via shutdown hook.");
         }));
 
+        // Wait for user to press Enter before shutting down
         Scanner scanner = new Scanner(System.in);
-        scanner.nextLine(); // Wait for user input
+        logger.info("Press ENTER to stop the application...");
+        scanner.nextLine();
         scanner.close();
 
+        // If the provider is still running, stop it now
         if (provider.running) {
+            logger.info("User requested shutdown. Stopping RenewableProvider...");
             provider.stop();
+            logger.info("RenewableProvider stopped.");
         }
 
-        System.out.println("Renewable Provider Application finished.");
+        logger.info("Renewable Provider Application finished.");
     }
 }

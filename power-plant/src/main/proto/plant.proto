@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package desm.dps.grpc;
+
+option java_multiple_files = true;
+option java_outer_classname = "PlantProto";
+
+// Represents the network address of a plant
+message PlantAddress {
+  string host = 1;
+  int32 port = 2;
+}
+
+// Information about a power plant, used for internal gRPC and registration
+message PowerPlantMeta {
+  string plant_id = 1;
+  PlantAddress address = 2; // gRPC listening address
+}
+
+// Request to announce presence to other existing plants
+message AnnouncePresenceRequest {
+  PowerPlantMeta new_plant_info = 1;
+}
+
+// Generic Acknowledgment message
+message Ack {
+  bool success = 1;
+  string message = 2;
+}
+
+// Represents a bid made by a plant
+message Bid {
+  string plant_id = 1;
+  double price = 2; // Price in $/kWh
+}
+
+// Token for the election algorithm to select the winner based on the lowest price
+message ElectCoordinatorToken {
+  string initiator_id = 1; // Plant ID of the plant that started this token
+  string energy_request_id = 2; // The energy request this election is for
+  Bid best_bid = 3; // Current best bid (lowest price, highest ID in case of tie)
+}
+
+// Announcement of the final winner for the energy request
+message EnergyWinnerAnnouncement {
+  string winning_plant_id = 1;
+  double winning_price = 2;
+  string energy_request_id = 3;
+}
+
+// Service definition for inter-plant communication
+service PlantCommunicationService {
+  // Called by a new plant to announce its presence to existing plants
+  rpc AnnouncePresence(AnnouncePresenceRequest) returns (Ack);
+
+  // Forwards the election token in the ring
+  rpc ForwardElectionToken(ElectCoordinatorToken) returns (Ack);
+
+  // Used by the initiator to announce the final winner of the bid to other plants
+  rpc AnnounceEnergyWinner(EnergyWinnerAnnouncement) returns (Ack);
+}

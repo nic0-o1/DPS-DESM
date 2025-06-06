@@ -135,54 +135,6 @@ public class ElectionManager {
 		grpcClient.forwardElectionToken(nextPlant, token);
 	}
 
-//	public void handleElectionToken(ElectCoordinatorToken token) {
-//		String selfId = powerPlant.getSelfInfo().getPlantId();
-//		String initiatorId = token.getInitiatorId();
-//		String requestId = token.getEnergyRequestId();
-//
-//		ElectionState state = getElectionState(requestId);
-//		if (state == null) {
-//			logger.warn("Plant {} received token for unknown or cleaned-up request {}. Ignoring.", selfId, requestId);
-//			return;
-//		}
-//
-//		// Rely on volatile read for a quick check.
-//		if (state.isWinnerAnnounced()) {
-//			logger.debug("Plant {} ignoring token for request {}, winner already announced.", selfId, requestId);
-//			return;
-//		}
-//
-//		state.updateBestBid(token.getBestBid());
-//
-//		if (selfId.equals(initiatorId)) {
-//			completeElectionRound(requestId, state);
-//			return;
-//		}
-//
-//		Bid forwardBid = state.getBestBid();
-//
-//		if (!powerPlant.isBusy()) {
-//			Bid myBid = Bid.newBuilder()
-//					.setPlantId(selfId)
-//					.setPrice(state.myBid)
-//					.build();
-//
-//			if (state.updateBestBid(myBid)) {
-//				forwardBid = myBid; // Our bid was better, update forwardBid
-//				logger.debug("Plant {} inserting its better bid ${} for request {}",
-//						selfId, state.myBid, requestId);
-//			}
-//		}
-//
-//		ElectCoordinatorToken forwardToken = ElectCoordinatorToken.newBuilder(token)
-//				.setBestBid(forwardBid)
-//				.build();
-//
-//		PowerPlantInfo nextPlant = powerPlant.getNextPlantInRing(selfId);
-//		logger.debug("Plant {} forwarding token for ER {} to {} (Initiator: {}, Best: {} at ${})",
-//				selfId, requestId, nextPlant.getPlantId(), initiatorId, forwardBid.getPlantId(), forwardBid.getPrice());
-//		grpcClient.forwardElectionToken(nextPlant, forwardToken);
-//	}
 
 	public void handleElectionToken(ElectCoordinatorToken token) {
 		String selfId = powerPlant.getSelfInfo().getPlantId();

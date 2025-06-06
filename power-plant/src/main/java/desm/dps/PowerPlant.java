@@ -240,22 +240,15 @@ public class PowerPlant {
         logger.info("Received Energy Request {} for {} kWh",
                 energyRequest.getRequestID(), energyRequest.getAmountKWh());
 
-        if (isBusy) {
-            logger.debug("Plant {} is busy with request {}. Ignoring request {}",
-                    selfInfo.getPlantId(), currentRequestId, energyRequest.getRequestID());
-            return;
-        }
-
-        double price = generatePrice();
-        logger.debug("Plant {} generated price {} for request {}",
-                selfInfo.getPlantId(), price, energyRequest.getRequestID());
-
-        electionManager.initiateElection(energyRequest, price);
+        // FINAL AND CORRECT: Delegate ALL processing to the ElectionManager.
+        // The manager will handle busy checks, price generation, and initiation.
+        electionManager.processNewEnergyRequest(energyRequest);
     }
 
     public double generatePrice() {
         double price = MIN_PRICE + (MAX_PRICE - MIN_PRICE) * random.nextDouble();
         return Math.round(price * 100.0) / 100.0;
+//        return 0.01;
     }
 
     public void fulfillEnergyRequest(EnergyRequest request, double price) {

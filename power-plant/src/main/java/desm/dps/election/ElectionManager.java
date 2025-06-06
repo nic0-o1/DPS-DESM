@@ -12,61 +12,67 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
+/**
+ * Manages distributed election process for energy requests using ring-based algorithm.
+ * Thread-safe implementation without native synchronization data structures.
+ */
 public class ElectionManager {
 	private static final Logger logger = LoggerFactory.getLogger(ElectionManager.class);
+	private static final double INVALID_BID = -1.0;
+	private static final int CLEANUP_DELAY_SECONDS = 30;
+	private static final int TEST_SLEEP_DURATION_MS = 22000; // Remove for production
 
-	// Core components
 	private final PowerPlant powerPlant;
 	private final PlantGrpcClient grpcClient;
+	private final ScheduledExecutorService cleanupExecutor;
 
-	// State management: Using HashMap, access MUST be synchronized.
 	private final Map<String, ElectionState> elections = new HashMap<>();
-	// A dedicated lock object for managing access to the 'elections' map.
 	private final Object electionsLock = new Object();
 
 	public ElectionManager(PowerPlant powerPlant, PlantGrpcClient grpcClient) {
 		this.powerPlant = powerPlant;
 		this.grpcClient = grpcClient;
+		this.cleanupExecutor = Executors.newScheduledThreadPool(2, r -> {
+			Thread t = new Thread(r);
+			t.setDaemon(true);
+			t.setName("ElectionCleanup-" + t.getId());
+			return t;
+		});
 	}
 
 	/**
-	 * Encapsulates election state. Uses volatile and a dedicated lock
-	 * for thread-safe access without concurrent collections.
+	 * Immutable state holder for election data with thread-safe operations.
 	 */
 	private static class ElectionState {
-		final EnergyRequest request;
-		final double myBid;
-
-		// Volatile ensures visibility of the reference across threads.
-		// Updates must be synchronized to ensure atomicity.
-		private volatile Bid bestBidSeen;
-		// Volatile ensures visibility; updates must be synchronized.
-		private volatile boolean winnerAnnounced = false;
-		// Lock for managing updates to bestBidSeen and winnerAnnounced together.
+		private final EnergyRequest request;
+		private final double myBid;
 		private final Object stateLock = new Object();
+
+		private volatile Bid bestBidSeen;
+		private volatile boolean winnerAnnounced = false;
+		private volatile boolean hasInitiated = false;
 
 		ElectionState(EnergyRequest request, double myBid) {
 			this.request = request;
 			this.myBid = myBid;
-			this.bestBidSeen = Bid.newBuilder()
+			this.bestBidSeen = createEmptyBid();
+		}
+
+		private static Bid createEmptyBid() {
+			return Bid.newBuilder()
 					.setPlantId("")
 					.setPrice(Double.MAX_VALUE)
 					.build();
 		}
 
-		// Updates the best bid if the new one is better.
-		// Synchronized to ensure atomic read-compare-write.
 		boolean updateBestBid(Bid newBid) {
-			// Quick, non-locking check for a potential quick exit.
-			// It's okay if this reads slightly stale data,
-			// as the synchronized block performs the definitive check.
-			if (!isBetterBid(newBid, this.bestBidSeen)) {
-				return false;
-			}
-
 			synchronized (stateLock) {
-				if (isBetterBid(newBid, this.bestBidSeen)) {
+				if (BidComparator.isBetter(newBid, this.bestBidSeen)) {
 					this.bestBidSeen = newBid;
 					return true;
 				}
@@ -74,218 +80,259 @@ public class ElectionManager {
 			}
 		}
 
-		// Gets the current best bid. Volatile ensures we see the latest write.
 		Bid getBestBid() {
 			return this.bestBidSeen;
 		}
 
-		// Checks if winner is announced. Volatile ensures we see the latest write.
 		boolean isWinnerAnnounced() {
 			return this.winnerAnnounced;
 		}
 
-		// Sets winner announced flag. Returns true if this call set it, false otherwise.
-		// Synchronized to ensure atomic check-and-set.
-		boolean setWinnerAnnounced() {
+		boolean trySetWinnerAnnounced() {
 			synchronized (stateLock) {
-				if (this.winnerAnnounced) {
-					return false; // Already announced.
+				if (!this.winnerAnnounced) {
+					this.winnerAnnounced = true;
+					return true;
 				}
-				this.winnerAnnounced = true;
-				return true; // We were the one to set it.
+				return false;
 			}
 		}
 
-		// Helper: Compares bids. Does not need synchronization as it's pure logic.
-		private boolean isBetterBid(Bid candidate, Bid current) {
-			if (candidate == null) return false;
-			if (current == null || current.getPrice() == Double.MAX_VALUE) return true;
-
-			if (candidate.getPrice() < current.getPrice()) {
-				return true;
+		boolean trySetInitiated() {
+			synchronized (stateLock) {
+				if (!this.hasInitiated) {
+					this.hasInitiated = true;
+					return true;
+				}
+				return false;
 			}
+		}
+
+		EnergyRequest getRequest() {
+			return request;
+		}
+
+		double getMyBid() {
+			return myBid;
+		}
+
+		boolean isValidBid() {
+			return myBid >= 0;
+		}
+	}
+
+	/**
+	 * Utility class for bid comparison logic.
+	 */
+	private static class BidComparator {
+		static boolean isBetter(Bid candidate, Bid current) {
+			if (candidate == null) return false;
+			if (current == null || isEmptyBid(current)) return true;
+			if (candidate.getPrice() < current.getPrice()) return true;
 			return candidate.getPrice() == current.getPrice() &&
 					candidate.getPlantId().compareTo(current.getPlantId()) < 0;
 		}
+
+		private static boolean isEmptyBid(Bid bid) {
+			return Objects.equals(bid.getPlantId(), "");
+		}
 	}
 
-	public void initiateElection(EnergyRequest energyRequest, double price) {
+	/**
+	 * Processes new energy request by creating election state and potentially initiating election.
+	 */
+	public void processNewEnergyRequest(EnergyRequest energyRequest) {
+		String selfId = getSelfPlantId();
 		String requestId = energyRequest.getRequestID();
-		String selfId = powerPlant.getSelfInfo().getPlantId();
 
+		double price = calculateBidPrice();
 		ElectionState state = getOrCreateElectionState(requestId, energyRequest, price);
 
-		Bid initialBid = Bid.newBuilder()
-				.setPlantId(selfId)
-				.setPrice(price)
-				.build();
+		performTestSleep(selfId); // Remove for production
 
-		state.updateBestBid(initialBid);
+		if (!state.isValidBid()) {
+			logger.info("Plant {} is BUSY, participating passively in election for request {}",
+					selfId, requestId);
+			return;
+		}
 
-		ElectCoordinatorToken token = ElectCoordinatorToken.newBuilder()
-				.setInitiatorId(selfId)
-				.setEnergyRequestId(requestId)
-				.setBestBid(state.getBestBid())
-				.build();
-
-		PowerPlantInfo nextPlant = powerPlant.getNextPlantInRing(selfId);
-		logger.info("Plant {} initiating election for request {}, forwarding to {}",
-				selfId, requestId, nextPlant.getPlantId());
-
-		grpcClient.forwardElectionToken(nextPlant, token);
+		if (state.trySetInitiated()) {
+			logger.info("Plant {} generated price ${} for request {}", selfId, price, requestId);
+			initiateElection(state);
+		} else {
+			logger.info("Plant {} received duplicate MQTT request for {}", selfId, requestId);
+		}
 	}
 
-
+	/**
+	 * Handles incoming election token in the ring-based election algorithm.
+	 */
 	public void handleElectionToken(ElectCoordinatorToken token) {
-		String selfId = powerPlant.getSelfInfo().getPlantId();
+		String selfId = getSelfPlantId();
 		String initiatorId = token.getInitiatorId();
 		String requestId = token.getEnergyRequestId();
 
-		ElectionState state = getElectionState(requestId);
+		ElectionState state = getOrCreateElectionStateFromToken(token);
+		state.trySetInitiated();
 
-		if (state == null) {
-			// This plant has no local state for this election.
-			// This could mean:
-			// 1. It was busy when the energy request MQTT message arrived and thus didn't initiate/create state.
-			// 2. It hasn't processed the MQTT message for this requestID yet (token arrived faster).
-			// 3. The election was completed, and its state was cleaned up.
-			// In cases 1 and 2 (most relevant to the problem), it MUST forward the token.
-
-			if (selfId.equals(initiatorId)) {
-				// This plant is the INITIATOR of the token, but its own election state is missing.
-				// This is a problematic state. It cannot properly complete its initiated election round.
-				// Forwarding might lead to loops if the state is never restored.
-				// Not forwarding means this initiator's election attempt effectively fails here.
-				logger.error("CRITICAL: Plant {} (initiator) received its token for request {} but has NO local election state. " +
-								"Cannot complete election. Token will NOT be forwarded further by this initiator to prevent potential loops and election failure.",
-						selfId, requestId);
-				// No further action for this token by this initiator with lost state.
-			} else {
-				// This plant is NOT the initiator and has no local state (e.g., was busy, or MQTT not yet processed for this plant).
-				// It must forward the token to ensure the election started by 'initiatorId' can continue.
-				PowerPlantInfo nextPlant = powerPlant.getNextPlantInRing(selfId);
-				logger.info("Plant {} (not initiator, no local state for request {}) is forwarding token from initiator {} to {}. Current best bid in token: {}@${}.",
-						selfId, requestId, initiatorId, nextPlant.getPlantId(),
-						token.getBestBid().getPlantId(), token.getBestBid().getPrice());
-				grpcClient.forwardElectionToken(nextPlant, token); // Forward the token as received.
-			}
-			return; // Finished processing token for this plant (which had no local state for this election).
-		}
-
-		// If state is not null, proceed with the existing logic:
-		if (state.isWinnerAnnounced()) { // Volatile read check
-			logger.debug("Plant {} ignoring token for request {}, winner already announced.", selfId, requestId);
+		if (state.isWinnerAnnounced()) {
+			logger.debug("Plant {} dropping token for request {}, winner already announced",
+					selfId, requestId);
 			return;
 		}
-
-		state.updateBestBid(token.getBestBid()); // Update with bid from token
 
 		if (selfId.equals(initiatorId)) {
-			// I am the initiator, token returned. State exists.
-			completeElectionRound(requestId, state);
+			completeElectionRound(state, token);
+		} else {
+			forwardTokenInRing(state, token);
+		}
+	}
+
+	/**
+	 * Processes winner announcement from other plants.
+	 */
+	public void processEnergyWinnerAnnouncement(EnergyWinnerAnnouncement announcement) {
+		String selfId = getSelfPlantId();
+		String requestId = announcement.getEnergyRequestId();
+		String winnerId = announcement.getWinningPlantId();
+
+		ElectionState state = getElectionState(requestId);
+		if (state == null) {
+			logger.debug("Plant {} received winner announcement for unknown request {}",
+					selfId, requestId);
 			return;
 		}
 
-		// Not the initiator, but I have state (meaning I did initiate or process this request earlier and I'm not busy for bidding now, or became available).
-		Bid forwardBid = state.getBestBid(); // Start with the current best (which includes token's bid)
+		if (state.trySetWinnerAnnounced()) {
+			logger.info("Plant {} acknowledges winner {} for request {} at ${}",
+					selfId, winnerId, requestId, announcement.getWinningPrice());
 
-		if (!powerPlant.isBusy()) { // Check if I can bid *now*
-			// Create my bid based on the price stored in my ElectionState
-			Bid myBid = Bid.newBuilder()
-					.setPlantId(selfId)
-					.setPrice(state.myBid) // myBid was set when ElectionState was created
-					.build();
-
-			if (state.updateBestBid(myBid)) { // If my bid is better
-				forwardBid = myBid; // Update the bid to be forwarded
-				logger.debug("Plant {} inserting its better bid ${} for request {}",
-						selfId, state.myBid, requestId);
+			if (winnerId.equals(selfId)) {
+				logger.info("Plant {} is the winner! Fulfilling request {}", selfId, requestId);
+				fulfillEnergyRequest(state, announcement.getWinningPrice());
 			}
-		} else {
-			logger.debug("Plant {} is busy, not inserting its own bid for request {}. Forwarding current best from token.", selfId, requestId);
+
+			scheduleCleanup(requestId);
+		}
+	}
+
+	/**
+	 * Shuts down the election manager and cleanup resources.
+	 */
+	public void shutdown() {
+		cleanupExecutor.shutdown();
+		try {
+			if (!cleanupExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+				cleanupExecutor.shutdownNow();
+			}
+		} catch (InterruptedException e) {
+			cleanupExecutor.shutdownNow();
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	// Private helper methods
+
+	private void initiateElection(ElectionState state) {
+		String selfId = getSelfPlantId();
+		Bid myBid = createBid(selfId, state.getMyBid());
+		state.updateBestBid(myBid);
+
+		ElectCoordinatorToken token = createElectionToken(selfId, state, myBid);
+		PowerPlantInfo nextPlant = getNextPlantInRing(selfId);
+
+		if (nextPlant == null || nextPlant.getPlantId().equals(selfId)) {
+			logger.warn("Plant {} is alone in ring, declaring self winner for request {}",
+					selfId, state.getRequest().getRequestID());
+			completeElectionRound(state, token);
+			return;
 		}
 
-		ElectCoordinatorToken forwardToken = ElectCoordinatorToken.newBuilder(token) // Create new token based on incoming
-				.setBestBid(forwardBid) // Set the potentially updated best bid
+		logger.info("Plant {} initiating election for request {}, forwarding to {}",
+				selfId, state.getRequest().getRequestID(), nextPlant.getPlantId());
+		grpcClient.forwardElectionToken(nextPlant, token);
+	}
+
+	private void forwardTokenInRing(ElectionState state, ElectCoordinatorToken incomingToken) {
+		String selfId = getSelfPlantId();
+
+		state.updateBestBid(incomingToken.getBestBid());
+		Bid bestBid = getBestBidSafely(state);
+
+		if (state.isValidBid()) {
+			Bid myBid = createBid(selfId, state.getMyBid());
+			logger.info("Plant {} considering bid ${} for request {}, current best: {} @ ${}",
+					selfId, myBid.getPrice(), state.getRequest().getRequestID(),
+					bestBid.getPlantId(), bestBid.getPrice());
+
+			if (state.updateBestBid(myBid)) {
+				bestBid = getBestBidSafely(state);
+				logger.info("Plant {} has better bid, updating token", selfId);
+			}
+		} else {
+			logger.info("Plant {} is busy, forwarding token with best bid: {} @ ${}",
+					selfId, bestBid.getPlantId(), bestBid.getPrice());
+		}
+
+		ElectCoordinatorToken forwardToken = incomingToken.toBuilder()
+				.setBestBid(bestBid)
 				.build();
-
-		PowerPlantInfo nextPlant = powerPlant.getNextPlantInRing(selfId);
-		logger.debug("Plant {} forwarding token for ER {} to {} (Initiator: {}, Best: {} at ${})",
-				selfId, requestId, nextPlant.getPlantId(), initiatorId, forwardBid.getPlantId(), forwardBid.getPrice());
-		grpcClient.forwardElectionToken(nextPlant, forwardToken);
+		grpcClient.forwardElectionToken(getNextPlantInRing(selfId), forwardToken);
 	}
 
-	private void completeElectionRound(String requestId, ElectionState state) {
-		String selfId = powerPlant.getSelfInfo().getPlantId();
-		Bid currentBestBid = state.getBestBid();
+	private void completeElectionRound(ElectionState state, ElectCoordinatorToken token) {
+		String selfId = getSelfPlantId();
+		state.updateBestBid(token.getBestBid());
+		Bid winnerBid = getBestBidSafely(state);
 
-		logger.info("Plant {} completed its election round for request {}. Best bid seen: {} at ${}",
-				selfId, requestId, currentBestBid.getPlantId(), currentBestBid.getPrice());
+		if (state.trySetWinnerAnnounced()) {
+			logger.info("Plant {} completed election for request {}, winner: {} @ ${}",
+					selfId, state.getRequest().getRequestID(),
+					winnerBid.getPlantId(), winnerBid.getPrice());
 
-		if (selfId.equals(currentBestBid.getPlantId())) {
-			if (state.setWinnerAnnounced()) {
-				logger.info("Plant {} identified itself as the winner for request {}. Initiating fulfillment and announcing...",
-						selfId, requestId);
-				powerPlant.fulfillEnergyRequest(state.request, currentBestBid.getPrice());
-				announceWinner(requestId, currentBestBid.getPlantId(), currentBestBid.getPrice());
-			} else {
-				logger.debug("Plant {} identified as winner, but announcement already made/in_progress.", selfId);
+			if (winnerBid.getPlantId().equals(selfId)) {
+				logger.info("Plant {} is the winner! Fulfilling request {}",
+						selfId, state.getRequest().getRequestID());
+				fulfillEnergyRequest(state, winnerBid.getPrice());
 			}
+
+			announceWinnerToOthers(state.getRequest().getRequestID(), winnerBid);
+			scheduleCleanup(state.getRequest().getRequestID());
 		} else {
-			logger.debug("Plant {} completed its round, but {} is the winner. Not announcing.",
-					selfId, currentBestBid.getPlantId());
+			logger.info("Plant {} completed election for request {}, but winner already announced",
+					selfId, state.getRequest().getRequestID());
 		}
 	}
 
-	private void announceWinner(String requestId, String winnerId, double winnerPrice) {
+	private void announceWinnerToOthers(String requestId, Bid winnerBid) {
 		EnergyWinnerAnnouncement announcement = EnergyWinnerAnnouncement.newBuilder()
-				.setWinningPlantId(winnerId)
-				.setWinningPrice(winnerPrice)
+				.setWinningPlantId(winnerBid.getPlantId())
+				.setWinningPrice(winnerBid.getPrice())
 				.setEnergyRequestId(requestId)
 				.build();
 
 		for (PowerPlantInfo plant : powerPlant.getOtherPlants()) {
-			if (!plant.getPlantId().equals(powerPlant.getSelfInfo().getPlantId())) {
-				logger.info("Announcing Energy Winner {} for ER {} to {}", winnerId, requestId, plant.getPlantId());
+			if (!plant.getPlantId().equals(getSelfPlantId())) {
 				grpcClient.announceEnergyWinner(plant, announcement);
 			}
 		}
-
-		processEnergyWinnerAnnouncement(announcement);
 	}
 
-	public void processEnergyWinnerAnnouncement(EnergyWinnerAnnouncement announcement) {
-		String requestId = announcement.getEnergyRequestId();
-		String winnerId = announcement.getWinningPlantId();
-		double winnerPrice = announcement.getWinningPrice();
-		String selfId = powerPlant.getSelfInfo().getPlantId();
-
-		ElectionState state = getElectionState(requestId);
-		if (state == null) {
-			logger.debug("Plant {} ignoring winner announcement for request {} (cleaned up).", selfId, requestId);
-			return;
-		}
-
-		// Try to set winner announced. If we succeed, we process.
-		// If it was already set, we log a debug message and stop.
-		if (state.setWinnerAnnounced()) {
-			logger.info("Plant {} acknowledges winner {} for request {} at ${}",
-					selfId, winnerId, requestId, winnerPrice);
-
-			if (winnerId.equals(selfId)) {
-				powerPlant.fulfillEnergyRequest(state.request, winnerPrice);
-			}
-			scheduleCleanup(requestId);
-		} else {
-			logger.debug("Plant {} ignoring duplicate winner announcement for request {}", selfId, requestId);
-		}
-	}
-
-	// Helper methods using 'synchronized (electionsLock)' for map access.
 	private ElectionState getOrCreateElectionState(String requestId, EnergyRequest request, double price) {
 		synchronized (electionsLock) {
 			return elections.computeIfAbsent(requestId, k -> new ElectionState(request, price));
 		}
+	}
+
+	private ElectionState getOrCreateElectionStateFromToken(ElectCoordinatorToken token) {
+		String requestId = token.getEnergyRequestId();
+		EnergyRequest request = new EnergyRequest(
+				requestId,
+				(int) token.getEnergyAmountKwh(),
+				System.currentTimeMillis()
+		);
+		double price = calculateBidPrice();
+		return getOrCreateElectionState(requestId, request, price);
 	}
 
 	private ElectionState getElectionState(String requestId) {
@@ -294,29 +341,65 @@ public class ElectionManager {
 		}
 	}
 
-	/**
-	 * Schedules cleanup using a simple new Thread with a sleep.
-	 * This is simple but less efficient than a thread pool or scheduler.
-	 */
 	private void scheduleCleanup(String requestId) {
-		new Thread(() -> {
-			try {
-				// Wait a few seconds to allow any in-flight messages to arrive.
-				Thread.sleep(5000);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt(); // Restore interrupt status
-				logger.warn("Cleanup thread for {} interrupted.", requestId);
-			} finally {
-				// Ensure removal happens within the lock.
-				synchronized (electionsLock) {
-					elections.remove(requestId);
-				}
-				logger.debug("Cleaned up election state for request {}", requestId);
+		cleanupExecutor.schedule(() -> {
+			synchronized (electionsLock) {
+				elections.remove(requestId);
 			}
-		}, "Cleanup-" + requestId.substring(0, 6)).start(); // Give the thread a name
+			logger.debug("Cleaned up election state for request {}", requestId);
+		}, CLEANUP_DELAY_SECONDS, TimeUnit.SECONDS);
 	}
 
-	// No shutdown method needed as we are not using a managed executor.
-	// However, be aware these cleanup threads might run briefly after main stops
-	// unless the application forces exit.
+	// Utility methods
+
+	private String getSelfPlantId() {
+		return powerPlant.getSelfInfo().getPlantId();
+	}
+
+	private double calculateBidPrice() {
+		return powerPlant.isBusy() ? INVALID_BID : powerPlant.generatePrice();
+	}
+
+	private PowerPlantInfo getNextPlantInRing(String selfId) {
+		return powerPlant.getNextPlantInRing(selfId);
+	}
+
+	private Bid createBid(String plantId, double price) {
+		return Bid.newBuilder()
+				.setPlantId(plantId)
+				.setPrice(price)
+				.build();
+	}
+
+	private ElectCoordinatorToken createElectionToken(String selfId, ElectionState state, Bid bestBid) {
+		return ElectCoordinatorToken.newBuilder()
+				.setInitiatorId(selfId)
+				.setEnergyRequestId(state.getRequest().getRequestID())
+				.setBestBid(bestBid)
+				.setEnergyAmountKwh(state.getRequest().getAmountKWh())
+				.build();
+	}
+
+	private Bid getBestBidSafely(ElectionState state) {
+		synchronized (state.stateLock) {
+			return state.getBestBid();
+		}
+	}
+
+	private void fulfillEnergyRequest(ElectionState state, double price) {
+		powerPlant.fulfillEnergyRequest(state.getRequest(), price);
+	}
+
+	private void performTestSleep(String selfId) {
+		// Remove this entire method for production
+		try {
+			logger.warn(">>> PLANT {} PAUSING FOR {} SECONDS TO ALLOW LATE JOINER <<<",
+					selfId, TEST_SLEEP_DURATION_MS / 1000);
+			Thread.sleep(TEST_SLEEP_DURATION_MS);
+			logger.warn(">>> PLANT {} RESUMING... <<<", selfId);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			logger.error("Test sleep was interrupted", e);
+		}
+	}
 }

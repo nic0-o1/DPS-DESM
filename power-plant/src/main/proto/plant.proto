@@ -39,6 +39,7 @@ message ElectCoordinatorToken {
   string initiator_id = 1; // Plant ID of the plant that started this token
   string energy_request_id = 2; // The energy request this election is for
   Bid best_bid = 3; // Current best bid (lowest price, highest ID in case of tie)
+  double energy_amount_kwh = 4; // *** NEW: The amount of energy requested ***
 }
 
 // Announcement of the final winner for the energy request

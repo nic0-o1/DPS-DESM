@@ -29,7 +29,8 @@ public class PowerPlantApp {
 //        String adminServerBaseUrl = scanner.nextLine().trim();
 //
 //        scanner.close();
-        String plantId = "003";
+        String plantId = "006";
+        int port = 56006;
         String adminServerBaseUrl = "http://localhost:8080";
         String grpcHost = "localhost";
         String grpcPort = "8888";
@@ -38,7 +39,7 @@ public class PowerPlantApp {
         String energyRequestTopic ="desm/energy/requests";
 
         // Initialize power plant
-        PowerPlantInfo selfInfo = new PowerPlantInfo(plantId, "localhost", 56003);
+        PowerPlantInfo selfInfo = new PowerPlantInfo(plantId, "localhost", port);
         PowerPlant powerPlant = new PowerPlant(selfInfo, adminServerBaseUrl,mqttBrokerUrl, energyRequestTopic);
 
         try {

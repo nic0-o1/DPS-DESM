@@ -60,7 +60,6 @@ public class EnergyRequestProcessor {
         }
     }
     /**
-     * [NEW METHOD]
      * Removes a request from the pending queue by its ID. This is called when another
      * plant has won the election for this request, making the queued item obsolete.
      *

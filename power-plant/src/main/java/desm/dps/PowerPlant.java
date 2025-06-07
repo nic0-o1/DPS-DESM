@@ -42,13 +42,15 @@ public class PowerPlant {
      * Constructs a new PowerPlant instance.
      * Initializes all the internal subsystems required for the plant's operation.
      *
-     * @param selfInfo           Information about this power plant.
-     * @param adminServerBaseUrl The base URL of the central administration server.
-     * @param mqttBrokerUrl      The URL of the MQTT broker for messaging.
-     * @param energyRequestTopic The MQTT topic for listening to energy requests.
+     * @param selfInfo              Information about this power plant.
+     * @param adminServerBaseUrl    The base URL of the central administration server.
+     * @param mqttBrokerUrl         The URL of the MQTT broker for messaging.
+     * @param energyRequestTopic    The MQTT topic for listening to energy requests.
+     * @param pollutionPublishTopic The MQTT topic for publishing pollution data
      */
-    public PowerPlant(PowerPlantInfo selfInfo, String adminServerBaseUrl, String mqttBrokerUrl, String energyRequestTopic) {
-        if (selfInfo == null || adminServerBaseUrl == null || mqttBrokerUrl == null || energyRequestTopic == null) {
+    public PowerPlant(PowerPlantInfo selfInfo, String adminServerBaseUrl, String mqttBrokerUrl, String energyRequestTopic,
+                      String pollutionPublishTopic) {
+        if (selfInfo == null || adminServerBaseUrl == null || mqttBrokerUrl == null || energyRequestTopic == null || pollutionPublishTopic == null) {
             throw new IllegalArgumentException("All constructor parameters must be non-null");
         }
         this.selfInfo = selfInfo;
@@ -59,7 +61,7 @@ public class PowerPlant {
         PlantGrpcClient grpcClient = new PlantGrpcClient(this);
         ElectionManager electionManager = new ElectionManager(this, grpcClient);
         this.energyRequestProcessor = new EnergyRequestProcessor(selfInfo.getPlantId(), electionManager);
-        this.pollutionMonitor = new PollutionMonitor(selfInfo, mqttBrokerUrl, "desm/pollution/data");
+        this.pollutionMonitor = new PollutionMonitor(selfInfo, mqttBrokerUrl, pollutionPublishTopic);
         this.serviceManager = new ServiceManager(this, selfInfo, grpcClient, electionManager, pollutionMonitor,
                 mqttBrokerUrl, energyRequestTopic);
 

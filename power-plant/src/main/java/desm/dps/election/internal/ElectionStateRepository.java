@@ -31,7 +31,7 @@ public class ElectionStateRepository {
      */
     public ElectionState getOrCreate(String requestId, EnergyRequest request, double price) {
         synchronized (electionsLock) {
-            return elections.computeIfAbsent(requestId, k -> {
+            return elections.computeIfAbsent(requestId, _ -> {
                 EnergyRequest requestToStore = (request != null) ? request : new EnergyRequest(requestId, 0, System.currentTimeMillis());
                 return new ElectionState(requestToStore, price);
             });

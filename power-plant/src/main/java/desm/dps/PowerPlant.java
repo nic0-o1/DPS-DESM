@@ -58,6 +58,9 @@ public class PowerPlant {
     private volatile PowerPlantInfo[] cachedRingArray = null;
     private volatile long ringCacheVersion = 0;
 
+    private final Queue<EnergyRequest> pendingRequests = new LinkedList<>();
+    private final Object pendingRequestsLock = new Object();
+
     public PowerPlant(PowerPlantInfo selfInfo, String adminServerBaseUrl,
                       String mqttBrokerUrl, String energyRequestTopic) {
         validateConstructorParameters(selfInfo, adminServerBaseUrl, mqttBrokerUrl, energyRequestTopic);
@@ -240,10 +243,26 @@ public class PowerPlant {
         logger.info("Received Energy Request {} for {} kWh",
                 energyRequest.getRequestID(), energyRequest.getAmountKWh());
 
-        // FINAL AND CORRECT: Delegate ALL processing to the ElectionManager.
-        // The manager will handle busy checks, price generation, and initiation.
-        electionManager.processNewEnergyRequest(energyRequest);
+        // Check if we can process this now or if it needs to be queued.
+        boolean processedImmediately = false;
+        synchronized (processingLock) {
+            if (!isBusy) {
+                // Not busy, we can try to process this request right away.
+                electionManager.processNewEnergyRequest(energyRequest);
+                processedImmediately = true;
+            }
+        }
+
+        if (!processedImmediately) {
+            // We were busy, so queue the request for later.
+            synchronized (pendingRequestsLock) {
+                pendingRequests.add(energyRequest);
+                logger.info("Plant {} is busy. Queued request {} for later processing. Queue size is now: {}",
+                        selfInfo.getPlantId(), energyRequest.getRequestID(), pendingRequests.size());
+            }
+        }
     }
+
 
     public double generatePrice() {
         double price = MIN_PRICE + (MAX_PRICE - MIN_PRICE) * random.nextDouble();
@@ -294,29 +313,55 @@ public class PowerPlant {
     private Thread createEnergyProductionThread(EnergyRequest request, long processingTimeMillis) {
         return new Thread(() -> {
             try {
-                Thread.sleep(processingTimeMillis*15);
-                clearBusyState();
-                logger.info("Plant {} finished fulfilling request {}. Now available",
-                        selfInfo.getPlantId(), request.getRequestID());
+                // Production time simulation
+                Thread.sleep(processingTimeMillis * 8);
             } catch (InterruptedException e) {
-                handleEnergyProductionInterruption(request);
+                logger.warn("Energy production for request {} interrupted in plant {}",
+                        request.getRequestID(), selfInfo.getPlantId());
+                Thread.currentThread().interrupt();
+            } finally {
+                // IMPORTANT: Clear the busy state AND check for pending work.
+                clearBusyStateAndProcessNext();
+                logger.info("Plant {} finished fulfilling request {}. Now available or processing next request.",
+                        selfInfo.getPlantId(), request.getRequestID());
             }
         }, "EnergyProduction-" + request.getRequestID());
     }
 
-    private void clearBusyState() {
+    private void clearBusyStateAndProcessNext() {
+        EnergyRequest nextRequest = null;
+
+        // Check for pending work first
+        synchronized (pendingRequestsLock) {
+            if (!pendingRequests.isEmpty()) {
+                nextRequest = pendingRequests.poll(); // Dequeue the next request
+                logger.info("Plant {} is now free. Dequeuing pending request {} to process. Queue size is now: {}",
+                        selfInfo.getPlantId(), nextRequest.getRequestID(), pendingRequests.size());
+            }
+        }
+
+        // Clear the busy flag.
+        // If there was no pending work, the plant is now truly free.
+        // If there was pending work, another thread processing that work will immediately set it to busy again.
         synchronized (processingLock) {
             isBusy = false;
             currentRequestId = null;
         }
+
+        // If we found a pending request, process it now.
+        if (nextRequest != null) {
+            // Use a new thread to avoid blocking the just-finished production thread
+            EnergyRequest finalNextRequest = nextRequest;
+            new Thread(() -> handleIncomingEnergyRequest(finalNextRequest)).start();
+        }
     }
 
-    private void handleEnergyProductionInterruption(EnergyRequest request) {
-        logger.warn("Energy production for request {} interrupted in plant {}",
-                request.getRequestID(), selfInfo.getPlantId());
-        clearBusyState();
-        Thread.currentThread().interrupt();
-    }
+//    private void handleEnergyProductionInterruption(EnergyRequest request) {
+//        logger.warn("Energy production for request {} interrupted in plant {}",
+//                request.getRequestID(), selfInfo.getPlantId());
+//        clearBusyState();
+//        Thread.currentThread().interrupt();
+//    }
 
     public void addOtherPlant(PowerPlantInfo newPlant) {
         if (!isValidNewPlant(newPlant)) {

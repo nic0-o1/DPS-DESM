@@ -148,7 +148,7 @@ public class ElectionManager {
 		double price = calculateBidPrice();
 		ElectionState state = getOrCreateElectionState(requestId, energyRequest, price);
 
-		performTestSleep(selfId); // Remove for production
+//		performTestSleep(selfId); // Remove for production
 
 		if (!state.isValidBid()) {
 			logger.info("Plant {} is BUSY, participating passively in election for request {}",

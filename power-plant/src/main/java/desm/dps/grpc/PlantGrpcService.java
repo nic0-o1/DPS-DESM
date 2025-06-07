@@ -88,6 +88,7 @@ public class PlantGrpcService extends PlantCommunicationServiceGrpc.PlantCommuni
                     request.getWinningPlantId(),
                     request.getWinningPrice());
 
+            powerPlant.removeRequestFromQueue(request.getEnergyRequestId());
             // Send acknowledgment first
             Ack ack = Ack.newBuilder().setSuccess(true).build();
             responseObserver.onNext(ack);

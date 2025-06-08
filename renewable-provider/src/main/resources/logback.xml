@@ -1,8 +1,14 @@
 <configuration>
-    <!-- Console Appender -->
+    <!-- Console Appender with Color and Alignment -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            <!--
+                %cyan(...) - sets color for timestamp
+                %-30.30thread - pads/truncates thread name to 30 chars
+                %highlight(%-5level) - colors level (INFO=blue, WARN=yellow, ERROR=red)
+                %-40.40logger{36} - pads/truncates logger name to 40 chars
+             -->
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %cyan([%-28.28thread]) %highlight(%-5level) %magenta(%-25.25replace(%logger{36}){'desm\.dps\.', ''}) - %msg%n</pattern>
         </encoder>
     </appender>
 
@@ -11,8 +17,10 @@
         <appender-ref ref="CONSOLE" />
     </root>
 
-    <!-- Specific Logger for RenewableProvider class -->
-<!--    <logger name="desm.dps.RenewableProvider" level="DEBUG" additivity="false">-->
-<!--        <appender-ref ref="CONSOLE" />-->
-<!--    </logger>-->
+    <!-- Specific Logger for PowerPlant class -->
+    <!-- You can keep additivity="false" if you ONLY want this logger's output -->
+    <!-- and not the root logger's output for this class. -->
+    <logger name="desm.dps.RenewableProviderApp" level="DEBUG" additivity="false">
+        <appender-ref ref="CONSOLE" />
+    </logger>
 </configuration>

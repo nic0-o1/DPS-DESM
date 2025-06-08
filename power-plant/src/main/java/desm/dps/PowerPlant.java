@@ -81,17 +81,17 @@ public class PowerPlant {
             throw new IllegalStateException("Cannot start a shutdown PowerPlant.");
         }
         logger.info("Starting PowerPlant {}", selfInfo.getPlantId());
-        try {
+//        try {
             serviceManager.startServices();
             registerAndAnnounce();
             // To enable pollution monitoring, uncomment the following line:
-            // pollutionMonitor.start();
+            pollutionMonitor.start();
             logger.info("PowerPlant {} is fully started and operational.", selfInfo.getPlantId());
-        } catch (Exception e) {
-            logger.error("Failed to start PowerPlant {}. Initiating shutdown.", selfInfo.getPlantId(), e);
-            shutdown(); // Ensure a clean shutdown on startup failure.
-            throw e;
-        }
+//        } catch (Exception e) {
+////            logger.error("Failed to start PowerPlant {}. Initiating shutdown.", selfInfo.getPlantId(), e);
+//            shutdown(); // Ensure a clean shutdown on startup failure.
+//            throw e;
+//        }
     }
 
     /**
@@ -146,6 +146,7 @@ public class PowerPlant {
     public double generatePrice() {
         double price = MIN_PRICE + (MAX_PRICE - MIN_PRICE) * random.nextDouble();
         return Math.round(price * 100.0) / 100.0;
+//        return 0.01;
     }
 
     /**

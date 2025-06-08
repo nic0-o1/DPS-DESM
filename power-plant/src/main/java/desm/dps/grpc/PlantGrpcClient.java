@@ -24,15 +24,15 @@ public class PlantGrpcClient {
 	}
 
 	private PlantCommunicationServiceBlockingStub getBlockingStub(PowerPlantInfo targetPlant) {
-		String targetId = targetPlant.getPlantId();
+		String targetId = targetPlant.plantId();
 		if (!blockingStubs.containsKey(targetId)) {
-			ManagedChannel channel = ManagedChannelBuilder.forAddress(targetPlant.getAddress(), targetPlant.getPort())
+			ManagedChannel channel = ManagedChannelBuilder.forAddress(targetPlant.address(), targetPlant.port())
 					.usePlaintext()
 					.build();
 			channels.put(targetId, channel);
 			blockingStubs.put(targetId, PlantCommunicationServiceGrpc.newBlockingStub(channel));
 			logger.info("Created new gRPC client stub for {} at {}:{}",
-					targetPlant.getPlantId(), targetPlant.getAddress(), targetPlant.getPort());
+					targetPlant.plantId(), targetPlant.address(), targetPlant.port());
 		}
 		return blockingStubs.get(targetId);
 	}
@@ -41,19 +41,19 @@ public class PlantGrpcClient {
 		try {
 			PlantCommunicationServiceBlockingStub stub = getBlockingStub(targetPlant);
 			PowerPlantMeta selfMeta = PowerPlantMeta.newBuilder()
-					.setPlantId(selfInfo.getPlantId())
+					.setPlantId(selfInfo.plantId())
 					.setAddress(PlantAddress.newBuilder()
-							.setHost(selfInfo.getAddress())
-							.setPort(selfInfo.getPort())
+							.setHost(selfInfo.address())
+							.setPort(selfInfo.port())
 							.build())
 					.build();
 			AnnouncePresenceRequest request = AnnouncePresenceRequest.newBuilder().setNewPlantInfo(selfMeta).build();
 
-			logger.info("Announcing presence of {} to {}", selfInfo.getPlantId(), targetPlant.getPlantId());
+			logger.info("Announcing presence of {} to {}", selfInfo.plantId(), targetPlant.plantId());
 			stub.withDeadlineAfter(5, TimeUnit.SECONDS).announcePresence(request);
 		} catch (StatusRuntimeException e) {
-			logger.warn("RPC to announcePresence to {} failed: {}", targetPlant.getPlantId(), e.getStatus());
-			powerPlant.removeOtherPlant(targetPlant.getPlantId());
+			logger.warn("RPC to announcePresence to {} failed: {}", targetPlant.plantId(), e.getStatus());
+			powerPlant.removeOtherPlant(targetPlant.plantId());
 		}
 	}
 
@@ -61,7 +61,7 @@ public class PlantGrpcClient {
 		try {
 			PlantCommunicationServiceBlockingStub stub = getBlockingStub(targetPlant);
 			logger.info("Forwarding token to {} for ER {} (Best Bid: {} @ ${})",
-					targetPlant.getPlantId(),
+					targetPlant.plantId(),
 					token.getEnergyRequestId(),
 					token.getBestBid().getPlantId().isEmpty() ? "None" : token.getBestBid().getPlantId(),
 					token.getBestBid().getPrice()
@@ -70,20 +70,20 @@ public class PlantGrpcClient {
 			stub.withDeadlineAfter(10, TimeUnit.SECONDS).forwardElectionToken(token);
 		} catch (StatusRuntimeException e) {
 			logger.error("RPC to forwardElectionToken to {} failed: {}. Removing plant from ring.",
-					targetPlant.getPlantId(), e.getStatus());
-			powerPlant.removeOtherPlant(targetPlant.getPlantId());
+					targetPlant.plantId(), e.getStatus());
+			powerPlant.removeOtherPlant(targetPlant.plantId());
 		}
 	}
 
 	public void announceEnergyWinner(PowerPlantInfo targetPlant, EnergyWinnerAnnouncement announcement) {
 		try {
 			PlantCommunicationServiceBlockingStub stub = getBlockingStub(targetPlant);
-			logger.debug("Announcing winner for ER {} to {}", announcement.getEnergyRequestId(), targetPlant.getPlantId());
+			logger.debug("Announcing winner for ER {} to {}", announcement.getEnergyRequestId(), targetPlant.plantId());
 			stub.withDeadlineAfter(10, TimeUnit.SECONDS).announceEnergyWinner(announcement);
 		} catch (StatusRuntimeException e) {
 			logger.warn("RPC to announceEnergyWinner to {} failed: {}. Removing plant.",
-					targetPlant.getPlantId(), e.getStatus());
-			powerPlant.removeOtherPlant(targetPlant.getPlantId());
+					targetPlant.plantId(), e.getStatus());
+			powerPlant.removeOtherPlant(targetPlant.plantId());
 		}
 	}
 

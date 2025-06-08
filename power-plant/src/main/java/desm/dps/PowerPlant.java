@@ -60,12 +60,12 @@ public class PowerPlant {
         this.plantRegistry = new PlantRegistry(selfInfo);
         PlantGrpcClient grpcClient = new PlantGrpcClient(this);
         ElectionManager electionManager = new ElectionManager(this, grpcClient);
-        this.energyRequestProcessor = new EnergyRequestProcessor(selfInfo.getPlantId(), electionManager);
+        this.energyRequestProcessor = new EnergyRequestProcessor(selfInfo.plantId(), electionManager);
         this.pollutionMonitor = new PollutionMonitor(selfInfo, mqttBrokerUrl, pollutionPublishTopic);
         this.serviceManager = new ServiceManager(this, selfInfo, grpcClient, electionManager, pollutionMonitor,
                 mqttBrokerUrl, energyRequestTopic);
 
-        logger.info("Initialized PowerPlant Facade for ID: {}", selfInfo.getPlantId());
+        logger.info("Initialized PowerPlant Facade for ID: {}", selfInfo.plantId());
     }
 
     /**
@@ -80,13 +80,13 @@ public class PowerPlant {
         if (isShutdown) {
             throw new IllegalStateException("Cannot start a shutdown PowerPlant.");
         }
-        logger.info("Starting PowerPlant {}", selfInfo.getPlantId());
+        logger.info("Starting PowerPlant {}", selfInfo.plantId());
 //        try {
             serviceManager.startServices();
             registerAndAnnounce();
             // To enable pollution monitoring, uncomment the following line:
             pollutionMonitor.start();
-            logger.info("PowerPlant {} is fully started and operational.", selfInfo.getPlantId());
+            logger.info("PowerPlant {} is fully started and operational.", selfInfo.plantId());
 //        } catch (Exception e) {
 ////            logger.error("Failed to start PowerPlant {}. Initiating shutdown.", selfInfo.getPlantId(), e);
 //            shutdown(); // Ensure a clean shutdown on startup failure.
@@ -103,9 +103,9 @@ public class PowerPlant {
             return;
         }
         isShutdown = true;
-        logger.info("Shutting down PowerPlant {}", selfInfo.getPlantId());
+        logger.info("Shutting down PowerPlant {}", selfInfo.plantId());
         serviceManager.shutdownServices();
-        logger.info("PowerPlant {} has been shut down.", selfInfo.getPlantId());
+        logger.info("PowerPlant {} has been shut down.", selfInfo.plantId());
     }
 
     /**

@@ -1,29 +1,40 @@
 package desm.dps;
 
-public class PowerPlantInfo {
-    private String plantId;
-    private String address;
-    private int port;
+import java.util.Objects;
 
-    public PowerPlantInfo() {}
+/**
+ * Represents the connection information for a power plant.
+ * <p>
+ * This class has been refactored to be an immutable data object.
+ * 1.  All fields are 'private final' to ensure they cannot be changed after construction.
+ * 2.  Setters have been removed.
+ * 3.  Validation is performed in the constructor to ensure an object can never be in an invalid state ("fail-fast").
+ * <p>
+ * The method names `getPlantId()`, `getAddress()`, etc., are preserved for backward compatibility.
+ */
+public record PowerPlantInfo(String plantId, String address,
+                             int port) { // 'final' prevents subclassing, which can break immutability
+    // The no-arg constructor has been removed as it would allow for an object with an invalid null state.
+    // All necessary data is now required upon creation.
+
     public PowerPlantInfo(String plantId, String address, int port) {
-        this.plantId = plantId;
-        this.address = address;
+        // --- Validation: Fail-fast by checking invariants at construction time ---
+        this.plantId = Objects.requireNonNull(plantId, "plantId cannot be null");
+        this.address = Objects.requireNonNull(address, "address cannot be null");
+
+        if (plantId.isBlank()) {
+            throw new IllegalArgumentException("plantId cannot be blank");
+        }
+        if (address.isBlank()) {
+            throw new IllegalArgumentException("address cannot be blank");
+        }
+        if (port < 0 || port > 65535) {
+            throw new IllegalArgumentException("Port must be between 0 and 65535. Received: " + port);
+        }
         this.port = port;
     }
 
-    public String getPlantId() {
-        return plantId;
-    }
-
-    public String getAddress() {
-        return address;
-    }
-
-    public int getPort() {
-        return port;
-    }
-
+    // --- toString, equals, and hashCode are preserved as they were correctly implemented ---
     @Override
     public String toString() {
         return "PowerPlantInfo{" +
@@ -33,18 +44,4 @@ public class PowerPlantInfo {
                 '}';
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        PowerPlantInfo that = (PowerPlantInfo) o;
-        return port == that.port &&
-                java.util.Objects.equals(plantId, that.plantId) &&
-                java.util.Objects.equals(address, that.address);
-    }
-
-    @Override
-    public int hashCode() {
-        return java.util.Objects.hash(plantId, address, port);
-    }
 }

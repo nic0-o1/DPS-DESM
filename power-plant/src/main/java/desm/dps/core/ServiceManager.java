@@ -80,42 +80,42 @@ public class ServiceManager {
 
     private void startGrpcServer() throws IOException {
         PlantGrpcService plantGrpcService = new PlantGrpcService(powerPlant, electionManager);
-        grpcServer = ServerBuilder.forPort(selfInfo.getPort())
+        grpcServer = ServerBuilder.forPort(selfInfo.port())
                 .addService(plantGrpcService)
                 .build()
                 .start();
-        logger.info("gRPC Server started for plant {} on port {}", selfInfo.getPlantId(), selfInfo.getPort());
+        logger.info("gRPC Server started for plant {} on port {}", selfInfo.plantId(), selfInfo.port());
     }
 
     private void startMqttSubscriber() throws MqttException {
         energyRequestSubscriber = new EnergyRequestSubscriber(
                 mqttBrokerUrl,
-                selfInfo.getPlantId() + "_subscriber",
+                selfInfo.plantId() + "_subscriber",
                 energyRequestTopic,
                 powerPlant
         );
         energyRequestSubscriber.start();
-        logger.info("MQTT Subscriber started for plant {} on topic {}", selfInfo.getPlantId(), energyRequestTopic);
+        logger.info("MQTT Subscriber started for plant {} on topic {}", selfInfo.plantId(), energyRequestTopic);
     }
 
     private void stopMqttSubscriber() {
         if (energyRequestSubscriber != null) {
             energyRequestSubscriber.stop();
-            logger.debug("Stopped MQTT subscriber for plant {}", selfInfo.getPlantId());
+            logger.debug("Stopped MQTT subscriber for plant {}", selfInfo.plantId());
         }
     }
 
     private void shutdownGrpcServer() {
         if (grpcServer != null && !grpcServer.isShutdown()) {
             grpcServer.shutdown();
-            logger.debug("Shut down gRPC server for plant {}", selfInfo.getPlantId());
+            logger.debug("Shut down gRPC server for plant {}", selfInfo.plantId());
         }
     }
 
     private void shutdownGrpcClient() {
         if (grpcClient != null) {
             grpcClient.shutdown();
-            logger.debug("Shut down gRPC client for plant {}", selfInfo.getPlantId());
+            logger.debug("Shut down gRPC client for plant {}", selfInfo.plantId());
         }
     }
 

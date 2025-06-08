@@ -43,7 +43,7 @@ public class ElectionManager {
 	 */
 	public void processNewEnergyRequest(EnergyRequest energyRequest) {
 //		performTestSleep();
-		String selfId = powerPlant.getSelfInfo().getPlantId();
+		String selfId = powerPlant.getSelfInfo().plantId();
 		double price = powerPlant.isBusy() ? INVALID_BID_PRICE : powerPlant.generatePrice();
 		ElectionState state = stateRepository.getOrCreate(energyRequest.getRequestID(), energyRequest, price);
 
@@ -69,10 +69,10 @@ public class ElectionManager {
 		state.trySetInitiated();
 
 		if (state.isWinnerAnnounced()) {
-			logger.debug("Plant {} dropping token for request {}, winner already announced", powerPlant.getSelfInfo().getPlantId(), token.getEnergyRequestId());
+			logger.debug("Plant {} dropping token for request {}, winner already announced", powerPlant.getSelfInfo().plantId(), token.getEnergyRequestId());
 			return;
 		}
-		if (powerPlant.getSelfInfo().getPlantId().equals(token.getInitiatorId())) {
+		if (powerPlant.getSelfInfo().plantId().equals(token.getInitiatorId())) {
 			if (algorithmProcessor.complete(state, token)) {
 				stateRepository.scheduleCleanup(token.getEnergyRequestId());
 			}
@@ -86,7 +86,7 @@ public class ElectionManager {
 	 * This logic is now identical to the original working implementation.
 	 */
 	public void processEnergyWinnerAnnouncement(EnergyWinnerAnnouncement announcement) {
-		String selfId = powerPlant.getSelfInfo().getPlantId();
+		String selfId = powerPlant.getSelfInfo().plantId();
 		String requestId = announcement.getEnergyRequestId();
 		String winnerId = announcement.getWinningPlantId();
 
@@ -112,7 +112,7 @@ public class ElectionManager {
 	}
 
 	private void performTestSleep() {
-		String selfId = powerPlant.getSelfInfo().getPlantId();
+		String selfId = powerPlant.getSelfInfo().plantId();
 		try {
 			logger.warn(">>> [TEST-ONLY] PLANT {} PAUSING FOR {} SECONDS BEFORE ELECTION <<<", selfId, TEST_SLEEP_DURATION_MS / 1000);
 			Thread.sleep(TEST_SLEEP_DURATION_MS);

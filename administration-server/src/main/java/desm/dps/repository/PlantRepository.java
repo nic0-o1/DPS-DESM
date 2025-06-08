@@ -15,10 +15,10 @@ public class PlantRepository {
     private final HashMap<String, PowerPlantInfo> registeredPlants = new HashMap<>();
 
     public synchronized boolean registerPlant(PowerPlantInfo toRegister) {
-        if (registeredPlants.containsKey(toRegister.getPlantId())) {
+        if (registeredPlants.containsKey(toRegister.plantId())) {
             return false;
         }
-        registeredPlants.put(toRegister.getPlantId(), toRegister);
+        registeredPlants.put(toRegister.plantId(), toRegister);
         logger.info("Registered new plant: {}", toRegister);
         return true;
     }

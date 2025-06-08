@@ -40,7 +40,7 @@ public class ElectionCommunicator {
         for (PowerPlantInfo plant : powerPlant.getOtherPlants()) {
             // Your original logic did not send the announcement to itself, which is correct.
             // This loop over `getOtherPlants()` naturally achieves that.
-            if (!plant.getPlantId().equals(powerPlant.getSelfInfo().getPlantId())) {
+            if (!plant.plantId().equals(powerPlant.getSelfInfo().plantId())) {
                 grpcClient.announceEnergyWinner(plant, announcement);
             }
         }

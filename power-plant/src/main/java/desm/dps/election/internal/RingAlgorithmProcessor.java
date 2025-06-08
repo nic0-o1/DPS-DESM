@@ -20,14 +20,14 @@ public class RingAlgorithmProcessor {
     }
 
     public void initiate(ElectionState state) {
-        String selfId = powerPlant.getSelfInfo().getPlantId();
+        String selfId = powerPlant.getSelfInfo().plantId();
         Bid myBid = createBid(selfId, state.getMyBid());
         state.updateBestBid(myBid);
 
         ElectCoordinatorToken token = createToken(selfId, state, myBid);
         PowerPlantInfo nextPlant = powerPlant.getNextPlantInRing(selfId);
 
-        if (nextPlant == null || nextPlant.getPlantId().equals(selfId)) {
+        if (nextPlant == null || nextPlant.plantId().equals(selfId)) {
             complete(state, token);
             return;
         }
@@ -38,20 +38,20 @@ public class RingAlgorithmProcessor {
         state.updateBestBid(incomingToken.getBestBid());
         Bid bestBid = state.getBestBid();
         if (state.isValidBid()) {
-            Bid myBid = createBid(powerPlant.getSelfInfo().getPlantId(), state.getMyBid());
+            Bid myBid = createBid(powerPlant.getSelfInfo().plantId(), state.getMyBid());
             if (state.updateBestBid(myBid)) {
                 bestBid = state.getBestBid();
             }
         }
         ElectCoordinatorToken forwardToken = incomingToken.toBuilder().setBestBid(bestBid).build();
-        communicator.forwardToken(powerPlant.getNextPlantInRing(powerPlant.getSelfInfo().getPlantId()), forwardToken);
+        communicator.forwardToken(powerPlant.getNextPlantInRing(powerPlant.getSelfInfo().plantId()), forwardToken);
     }
 
     public boolean complete(ElectionState state, ElectCoordinatorToken token) {
         state.updateBestBid(token.getBestBid());
         Bid winnerBid = state.getBestBid();
         if (state.trySetWinnerAnnounced()) {
-            if (winnerBid.getPlantId().equals(powerPlant.getSelfInfo().getPlantId())) {
+            if (winnerBid.getPlantId().equals(powerPlant.getSelfInfo().plantId())) {
                 powerPlant.fulfillEnergyRequest(state.getRequest(), winnerBid.getPrice());
             }
             communicator.broadcastWinner(state.getRequest().getRequestID(), winnerBid);

@@ -47,27 +47,27 @@ public class PlantController {
             }
             // Detailed validation of plantInfo's fields is now primarily in PlantService
 
-            logger.info("Received request to register new plant with ID: {}", plantInfo.getPlantId());
+            logger.info("Received request to register new plant with ID: {}", plantInfo.plantId());
             boolean registered = plantService.registerPlant(plantInfo);
 
             if (registered) {
-                logger.info("Plant registered successfully: {}", plantInfo.getPlantId());
+                logger.info("Plant registered successfully: {}", plantInfo.plantId());
                 // Return 201 Created with the resource, but no Location header
                 return ResponseEntity.status(HttpStatus.CREATED).body(plantService.getAllPlants());
             } else {
                 // Determine if it's a conflict (already exists) or bad data rejected by service
-                if (plantService.getPlantById(plantInfo.getPlantId()) != null) {
-                    logger.warn("Conflict: Plant with ID {} already exists.", plantInfo.getPlantId());
-                    return ResponseEntity.status(HttpStatus.CONFLICT).body("Plant with ID '" + plantInfo.getPlantId() + "' already exists.");
+                if (plantService.getPlantById(plantInfo.plantId()) != null) {
+                    logger.warn("Conflict: Plant with ID {} already exists.", plantInfo.plantId());
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body("Plant with ID '" + plantInfo.plantId() + "' already exists.");
                 } else {
                     // If not a conflict, it means the service rejected it due to invalid data
                     // (e.g., empty address, invalid port, etc., as checked in PlantService)
-                    logger.warn("Bad request: Plant data for ID {} was invalid as per service validation.", plantInfo.getPlantId());
+                    logger.warn("Bad request: Plant data for ID {} was invalid as per service validation.", plantInfo.plantId());
                     return ResponseEntity.badRequest().body("Invalid plant data. Please check ID, address, and port requirements.");
                 }
             }
         } catch (Exception e) {
-            logger.error("Error processing request to register plant {}: {}", (plantInfo != null && plantInfo.getPlantId() != null ? plantInfo.getPlantId() : "unknown_id"), e.getMessage(), e);
+            logger.error("Error processing request to register plant {}: {}", (plantInfo != null && plantInfo.plantId() != null ? plantInfo.plantId() : "unknown_id"), e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An internal server error occurred while registering the plant.");
         }
     }

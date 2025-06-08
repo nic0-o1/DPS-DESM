@@ -36,7 +36,7 @@ public class PlantRegistry {
     public void addInitialPlants(List<PowerPlantInfo> initialPlants) {
         synchronized (lock) {
             for (PowerPlantInfo plant : initialPlants) {
-                if (!plant.getPlantId().equals(selfInfo.getPlantId()) && !plantExistsUnsafe(plant.getPlantId())) {
+                if (!plant.plantId().equals(selfInfo.plantId()) && !plantExistsUnsafe(plant.plantId())) {
                     otherPlantsList.add(plant);
                 }
             }
@@ -50,16 +50,16 @@ public class PlantRegistry {
      * @param newPlant The plant to add.
      */
     public void addPlant(PowerPlantInfo newPlant) {
-        if (newPlant == null || newPlant.getPlantId().equals(selfInfo.getPlantId())) {
+        if (newPlant == null || newPlant.plantId().equals(selfInfo.plantId())) {
             return;
         }
         synchronized (lock) {
-            if (plantExistsUnsafe(newPlant.getPlantId())) {
+            if (plantExistsUnsafe(newPlant.plantId())) {
                 return;
             }
             otherPlantsList.add(newPlant);
             sortAndInvalidateCacheUnsafe();
-            logger.debug("Added new plant {}. Total known other plants: {}", newPlant.getPlantId(), otherPlantsList.size());
+            logger.debug("Added new plant {}. Total known other plants: {}", newPlant.plantId(), otherPlantsList.size());
         }
     }
 
@@ -73,7 +73,7 @@ public class PlantRegistry {
             return;
         }
         synchronized (lock) {
-            if (otherPlantsList.removeIf(plant -> plant.getPlantId().equals(plantId))) {
+            if (otherPlantsList.removeIf(plant -> plant.plantId().equals(plantId))) {
                 sortAndInvalidateCacheUnsafe();
                 logger.debug("Removed plant {}. Total known other plants: {}", plantId, otherPlantsList.size());
             }
@@ -130,11 +130,11 @@ public class PlantRegistry {
     // --- Unsafe helpers (must be called within a synchronized block) ---
 
     private boolean plantExistsUnsafe(String plantId) {
-        return otherPlantsList.stream().anyMatch(p -> p.getPlantId().equals(plantId));
+        return otherPlantsList.stream().anyMatch(p -> p.plantId().equals(plantId));
     }
 
     private void sortAndInvalidateCacheUnsafe() {
-        otherPlantsList.sort(Comparator.comparing(PowerPlantInfo::getPlantId));
+        otherPlantsList.sort(Comparator.comparing(PowerPlantInfo::plantId));
         this.cachedRingArray = null; // Invalidate cache on any modification
     }
 
@@ -142,13 +142,13 @@ public class PlantRegistry {
         List<PowerPlantInfo> allPlants = new ArrayList<>(otherPlantsList.size() + 1);
         allPlants.addAll(otherPlantsList);
         allPlants.add(selfInfo);
-        allPlants.sort(Comparator.comparing(PowerPlantInfo::getPlantId));
+        allPlants.sort(Comparator.comparing(PowerPlantInfo::plantId));
         return allPlants.toArray(new PowerPlantInfo[0]);
     }
 
     private PowerPlantInfo findNextInArray(PowerPlantInfo[] ring, String currentPlantId) {
         for (int i = 0; i < ring.length; i++) {
-            if (ring[i].getPlantId().equals(currentPlantId)) {
+            if (ring[i].plantId().equals(currentPlantId)) {
                 return ring[(i + 1) % ring.length]; // Wrap around
             }
         }

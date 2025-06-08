@@ -37,28 +37,28 @@ public class PlantService {
             logger.warn("Attempted to register a null plantInfo object.");
             return false;
         }
-        if (plantInfo.getPlantId() == null || plantInfo.getPlantId().trim().isEmpty()) {
+        if (plantInfo.plantId() == null || plantInfo.plantId().trim().isEmpty()) {
             logger.warn("Attempted to register a plant with null or empty ID.");
             return false;
         }
-        if (plantInfo.getAddress() == null || plantInfo.getAddress().trim().isEmpty()) {
-            logger.warn("Attempted to register plant ID {} with null or empty address.", plantInfo.getPlantId());
+        if (plantInfo.address() == null || plantInfo.address().trim().isEmpty()) {
+            logger.warn("Attempted to register plant ID {} with null or empty address.", plantInfo.plantId());
             return false;
         }
-        if (plantInfo.getPort() <= 0 || plantInfo.getPort() > 65535) { // Standard port range
-            logger.warn("Attempted to register plant ID {} with invalid port: {}.", plantInfo.getPlantId(), plantInfo.getPort());
+        if (plantInfo.port() <= 0 || plantInfo.port() > 65535) { // Standard port range
+            logger.warn("Attempted to register plant ID {} with invalid port: {}.", plantInfo.plantId(), plantInfo.port());
             return false;
         }
 
-        logger.info("Attempting to register plant with ID: {}", plantInfo.getPlantId());
+        logger.info("Attempting to register plant with ID: {}", plantInfo.plantId());
         // The repository's registerPlant method handles the check for pre-existing ID
         boolean success = plantRepository.registerPlant(plantInfo);
         if (success) {
-            logger.info("Successfully registered plant: {}", plantInfo.getPlantId());
+            logger.info("Successfully registered plant: {}", plantInfo.plantId());
         } else {
             // This 'else' will now predominantly mean the plant ID already exists,
             // as other validations are handled above.
-            logger.warn("Failed to register plant: ID {} already exists or another repository issue occurred.", plantInfo.getPlantId());
+            logger.warn("Failed to register plant: ID {} already exists or another repository issue occurred.", plantInfo.plantId());
         }
         return success;
     }

@@ -26,7 +26,7 @@ public class AdminServerClient {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<PowerPlantInfo> request = new HttpEntity<>(plantInfo, headers);
 
-            System.out.println("Registering plant: " + plantInfo.getPlantId());
+            System.out.println("Registering plant: " + plantInfo.plantId());
 
             ResponseEntity<PowerPlantInfo[]> response = restTemplate.postForEntity(
                     endpoint, request, PowerPlantInfo[].class);
@@ -38,7 +38,7 @@ public class AdminServerClient {
 
                 PowerPlantInfo[] plants = response.getBody();
                 if (plants != null) {
-                    System.out.println("Plant " + plantInfo.getPlantId() + " registered successfully");
+                    System.out.println("Plant " + plantInfo.plantId() + " registered successfully");
                     System.out.println("Total registered plants: " + plants.length);
                     return Arrays.asList(plants);
                 }
@@ -48,14 +48,14 @@ public class AdminServerClient {
 
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode() == HttpStatus.CONFLICT) {
-                System.err.println("Registration failed: Plant ID " + plantInfo.getPlantId() + " already exists");
+                System.err.println("Registration failed: Plant ID " + plantInfo.plantId() + " already exists");
             } else {
                 System.err.println("Registration request failed with HTTP error: " + e.getStatusCode());
                 System.err.println("Error response: " + e.getResponseBodyAsString());
             }
             return null;
         } catch (RestClientException e) {
-            System.err.println("Failed to register plant " + plantInfo.getPlantId() + ": " + e.getClass());
+            System.err.println("Failed to register plant " + plantInfo.plantId() + ": " + e.getClass());
             return null;
         }
     }

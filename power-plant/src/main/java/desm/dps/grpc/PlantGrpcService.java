@@ -26,12 +26,12 @@ public class PlantGrpcService extends PlantCommunicationServiceGrpc.PlantCommuni
                     meta.getAddress().getHost(),
                     meta.getAddress().getPort()
             );
-            logger.info("Received presence announcement from: {}", newPlantInfo.getPlantId());
+            logger.info("Received presence announcement from: {}", newPlantInfo.plantId());
             powerPlant.addOtherPlant(newPlantInfo);
 
             Ack ack = Ack.newBuilder()
                     .setSuccess(true)
-                    .setMessage("Presence acknowledged by " + powerPlant.getSelfInfo().getPlantId())
+                    .setMessage("Presence acknowledged by " + powerPlant.getSelfInfo().plantId())
                     .build();
             responseObserver.onNext(ack);
             responseObserver.onCompleted();
@@ -49,7 +49,7 @@ public class PlantGrpcService extends PlantCommunicationServiceGrpc.PlantCommuni
     @Override
     public void forwardElectionToken(ElectCoordinatorToken request, StreamObserver<Ack> responseObserver) {
         try {
-            String selfId = powerPlant.getSelfInfo().getPlantId();
+            String selfId = powerPlant.getSelfInfo().plantId();
             logger.info("gRPC service received ForwardElectionToken for ER: {} from initiator: {} (current best: {} at ${})",
                     request.getEnergyRequestId(),
                     request.getInitiatorId(),

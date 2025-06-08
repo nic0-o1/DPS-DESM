@@ -28,7 +28,7 @@ public class PollutionMonitor {
     public PollutionMonitor(PowerPlantInfo selfInfo, String mqttBrokerUrl, String pollutionTopic) {
         this.selfInfo = selfInfo;
         this.sensorManager = new SensorManager();
-        this.pollutionDataPublisher = new PollutionDataPublisher(mqttBrokerUrl, selfInfo.getPlantId(), pollutionTopic);
+        this.pollutionDataPublisher = new PollutionDataPublisher(mqttBrokerUrl, selfInfo.plantId(), pollutionTopic);
     }
 
     /**
@@ -38,11 +38,11 @@ public class PollutionMonitor {
      * @throws MqttException if the publisher client fails to connect.
      */
     public void start() throws MqttException {
-        logger.info("Starting pollution monitoring for plant {}.", selfInfo.getPlantId());
+        logger.info("Starting pollution monitoring for plant {}.", selfInfo.plantId());
         sensorManager.start();
         pollutionDataPublisher.start();
         shouldPublish = true;
-        publisherThread = new Thread(this::publishingLoop, selfInfo.getPlantId() + "-PollutionPublisher");
+        publisherThread = new Thread(this::publishingLoop, selfInfo.plantId() + "-PollutionPublisher");
         publisherThread.setDaemon(true);
         publisherThread.start();
     }
@@ -52,13 +52,13 @@ public class PollutionMonitor {
      */
     public void stop() {
         if (!shouldPublish && publisherThread == null) return; // Already stopped
-        logger.info("Stopping pollution monitoring for plant {}.", selfInfo.getPlantId());
+        logger.info("Stopping pollution monitoring for plant {}.", selfInfo.plantId());
         shouldPublish = false;
-        ServiceManager.interruptAndJoinThread(publisherThread, "pollution publisher", selfInfo.getPlantId());
+        ServiceManager.interruptAndJoinThread(publisherThread, "pollution publisher", selfInfo.plantId());
 
         if (sensorManager != null) {
             sensorManager.stopManager();
-            ServiceManager.interruptAndJoinThread(sensorManager, "SensorManager", selfInfo.getPlantId());
+            ServiceManager.interruptAndJoinThread(sensorManager, "SensorManager", selfInfo.plantId());
         }
         if (pollutionDataPublisher != null) {
             pollutionDataPublisher.stop();
@@ -76,7 +76,7 @@ public class PollutionMonitor {
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                logger.error("Error in pollution data publishing loop for plant {}: {}", selfInfo.getPlantId(), e.getMessage(), e);
+                logger.error("Error in pollution data publishing loop for plant {}: {}", selfInfo.plantId(), e.getMessage(), e);
             }
         }
         logger.info("Pollution data publishing thread stopped.");
@@ -86,12 +86,12 @@ public class PollutionMonitor {
         List<Double> averages = sensorManager.getAndClearAverages();
         if (averages != null && !averages.isEmpty()) {
             PollutionData data = new PollutionData(
-                    selfInfo.getPlantId(),
+                    selfInfo.plantId(),
                     System.currentTimeMillis(),
                     averages
             );
             pollutionDataPublisher.publish(data);
-            logger.debug("Published pollution data for plant {}.", selfInfo.getPlantId());
+            logger.debug("Published pollution data for plant {}.", selfInfo.plantId());
         }
     }
 }

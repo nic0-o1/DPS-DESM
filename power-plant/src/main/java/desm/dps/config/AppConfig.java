@@ -10,18 +10,14 @@ public class AppConfig {
     private static AppConfig instance;
     private final Properties properties;
 
-    // Private constructor to prevent instantiation
     private AppConfig() {
         properties = new Properties();
-        // Use try-with-resources to ensure the stream is closed
         try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(CONFIG_FILE)) {
             if (inputStream == null) {
                 throw new IOException("Configuration file '" + CONFIG_FILE + "' not found in the classpath.");
             }
             properties.load(inputStream);
         } catch (IOException e) {
-            // In a real application, you'd want more robust error handling or logging.
-            // For this example, we'll throw a runtime exception to halt startup.
             throw new RuntimeException("Failed to load configuration file: " + CONFIG_FILE, e);
         }
     }

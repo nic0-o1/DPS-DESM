@@ -1,5 +1,6 @@
 package desm.dps;
 
+import desm.dps.config.AppConfig;
 import desm.dps.core.EnergyRequestProcessor;
 import desm.dps.core.PlantRegistry;
 import desm.dps.core.PollutionMonitor;
@@ -27,8 +28,6 @@ public class PowerPlant {
     private final PowerPlantInfo selfInfo;
     private final AdminServerClient adminClient;
     private final Random random = new Random();
-    private static final double MIN_PRICE = 0.1;
-    private static final double MAX_PRICE = 0.9;
 
     // --- Subsystem Components (Hidden behind the Facade) ---
     private final PlantRegistry plantRegistry;
@@ -37,6 +36,8 @@ public class PowerPlant {
     private final PollutionMonitor pollutionMonitor;
 
     private volatile boolean isShutdown = false;
+
+    private final AppConfig config;
 
     /**
      * Constructs a new PowerPlant instance.
@@ -65,6 +66,8 @@ public class PowerPlant {
         this.serviceManager = new ServiceManager(this, selfInfo, grpcClient, electionManager, pollutionMonitor,
                 mqttBrokerUrl, energyRequestTopic);
 
+        this.config = AppConfig.getInstance();
+
         logger.info("Initialized PowerPlant Facade for ID: {}", selfInfo.plantId());
     }
 
@@ -81,17 +84,10 @@ public class PowerPlant {
             throw new IllegalStateException("Cannot start a shutdown PowerPlant.");
         }
         logger.info("Starting PowerPlant {}", selfInfo.plantId());
-//        try {
             serviceManager.startServices();
             registerAndAnnounce();
-            // To enable pollution monitoring, uncomment the following line:
             pollutionMonitor.start();
             logger.info("PowerPlant {} is fully started and operational.", selfInfo.plantId());
-//        } catch (Exception e) {
-////            logger.error("Failed to start PowerPlant {}. Initiating shutdown.", selfInfo.getPlantId(), e);
-//            shutdown(); // Ensure a clean shutdown on startup failure.
-//            throw e;
-//        }
     }
 
     /**
@@ -144,9 +140,10 @@ public class PowerPlant {
      * @return A randomly generated price.
      */
     public double generatePrice() {
-        double price = MIN_PRICE + (MAX_PRICE - MIN_PRICE) * random.nextDouble();
+        double minPrice = config.getMinPrice();
+        double maxPrice = config.getMaxPrice();
+        double price = minPrice + (maxPrice - minPrice) * random.nextDouble();
         return Math.round(price * 100.0) / 100.0;
-//        return 0.01;
     }
 
     /**

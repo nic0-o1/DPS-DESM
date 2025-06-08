@@ -65,10 +65,11 @@ public class MeasurementRepository {
                 return Double.NaN;
             }
             for (StoredPollutionDataEntry entry : allPollutionEntries) {
-                logger.info("Entry: plantId={}, timestamp={}, inRange={}",
+                boolean inRange = entry.listComputationTimestamp() >= t1 && entry.listComputationTimestamp() <= t2;
+                logger.debug("Entry: plantId={}, timestamp={}, inRange={}",
                         entry.plantId(), entry.listComputationTimestamp(),
-                        (entry.listComputationTimestamp() >= t1 && entry.listComputationTimestamp() <= t2));
-                if (entry.listComputationTimestamp() >= t1 && entry.listComputationTimestamp() <= t2) {
+                        inRange);
+                if (inRange) {
                     // Calculate the average of this emission level (list of averages)
                     if (!entry.averages().isEmpty()) {
                         double sum = 0;
@@ -99,16 +100,5 @@ public class MeasurementRepository {
         logger.info("Calculated overall average CO2 of {} from {} emission levels between {} and {}.",
                 String.format("%.2f", overallAverage), emissionLevelAverages.size(), t1, t2);
         return overallAverage;
-    }
-
-    /**
-     * Clears all stored pollution data. Primarily for testing or reset purposes.
-     * Synchronized to ensure thread safety.
-     */
-    public void clearAllData() {
-        synchronized (lock) {
-            allPollutionEntries.clear();
-            logger.info("All pollution data cleared from repository.");
-        }
     }
 }

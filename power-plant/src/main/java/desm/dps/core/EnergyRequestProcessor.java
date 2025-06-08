@@ -55,7 +55,7 @@ public class EnergyRequestProcessor {
             synchronized (pendingRequestsLock) {
                 pendingRequests.add(energyRequest);
                 logger.info("Plant {} is busy. Queued request {}. Queue size: {}",
-                        selfPlantId, energyRequest.getRequestID(), pendingRequests.size());
+                        selfPlantId, energyRequest.requestID(), pendingRequests.size());
             }
         }
     }
@@ -70,7 +70,7 @@ public class EnergyRequestProcessor {
             return;
         }
         synchronized (pendingRequestsLock) {
-            boolean removed = pendingRequests.removeIf(req -> requestId.equals(req.getRequestID()));
+            boolean removed = pendingRequests.removeIf(req -> requestId.equals(req.requestID()));
             if (removed) {
                 logger.info("Removed completed request {} from queue as it is being handled by another plant.", requestId);
             }
@@ -88,33 +88,33 @@ public class EnergyRequestProcessor {
         synchronized (processingLock) {
             if (isBusy) {
                 logger.warn("Attempted to fulfill request {} but plant {} is already busy with {}",
-                        request.getRequestID(), selfPlantId, currentRequestId);
+                        request.requestID(), selfPlantId, currentRequestId);
                 return;
             }
             isBusy = true;
-            currentRequestId = request.getRequestID();
+            currentRequestId = request.requestID();
         }
 
         logger.info("Plant {} won bid for request {} with price ${}. Fulfilling {} kWh.",
-                selfPlantId, request.getRequestID(), price, request.getAmountKWh());
+                selfPlantId, request.requestID(), price, request.amountKWh());
         startEnergyProduction(request);
     }
 
     private void startEnergyProduction(EnergyRequest request) {
-        long processingTimeMillis = Math.max(1, (long) request.getAmountKWh()) * 8; // Simulation logic
-        logger.info("Energy production for request {} will take ~{} ms.", request.getRequestID(), processingTimeMillis);
+        long processingTimeMillis = Math.max(1, (long) request.amountKWh()) * 8; // Simulation logic
+        logger.info("Energy production for request {} will take ~{} ms.", request.requestID(), processingTimeMillis);
 
         Thread productionThread = new Thread(() -> {
             try {
                 Thread.sleep(processingTimeMillis);
             } catch (InterruptedException e) {
-                logger.warn("Energy production for request {} was interrupted in plant {}", request.getRequestID(), selfPlantId);
+                logger.warn("Energy production for request {} was interrupted in plant {}", request.requestID(), selfPlantId);
                 Thread.currentThread().interrupt();
             } finally {
-                logger.info("Plant {} finished fulfilling request {}.", selfPlantId, request.getRequestID());
+                logger.info("Plant {} finished fulfilling request {}.", selfPlantId, request.requestID());
                 onProductionFinished();
             }
-        }, "EnergyProduction-" + request.getRequestID());
+        }, "EnergyProduction-" + request.requestID());
 
         productionThread.setDaemon(true);
         productionThread.start();
@@ -138,7 +138,7 @@ public class EnergyRequestProcessor {
 
         // If there was a pending request, process it now.
         if (nextRequest != null) {
-            logger.info("Processing dequeued request {}.", nextRequest.getRequestID());
+            logger.info("Processing dequeued request {}.", nextRequest.requestID());
             processIncomingRequest(nextRequest);
         } else {
             logger.info("No pending requests. Plant {} is now idle.", selfPlantId);

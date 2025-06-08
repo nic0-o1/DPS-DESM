@@ -54,7 +54,7 @@ public class RingAlgorithmProcessor {
             if (winnerBid.getPlantId().equals(powerPlant.getSelfInfo().plantId())) {
                 powerPlant.fulfillEnergyRequest(state.getRequest(), winnerBid.getPrice());
             }
-            communicator.broadcastWinner(state.getRequest().getRequestID(), winnerBid);
+            communicator.broadcastWinner(state.getRequest().requestID(), winnerBid);
             return true;
         }
         return false;
@@ -64,9 +64,9 @@ public class RingAlgorithmProcessor {
     private ElectCoordinatorToken createToken(String selfId, ElectionState state, Bid bestBid) {
         return ElectCoordinatorToken.newBuilder()
                 .setInitiatorId(selfId)
-                .setEnergyRequestId(state.getRequest().getRequestID())
+                .setEnergyRequestId(state.getRequest().requestID())
                 .setBestBid(bestBid)
-                .setEnergyAmountKwh(state.getRequest().getAmountKWh())
+                .setEnergyAmountKwh(state.getRequest().amountKWh())
                 .build();
     }
 }

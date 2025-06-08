@@ -124,8 +124,8 @@ public class EnergyRequestSubscriber implements MqttCallback {
             EnergyRequest energyRequest = objectMapper.readValue(payload, EnergyRequest.class);
 
             // Validate the deserialized request before processing.
-            if (energyRequest != null && energyRequest.getRequestID() != null && !energyRequest.getRequestID().trim().isEmpty()) {
-                logger.debug("Forwarding valid energy request with ID '{}' for processing.", energyRequest.getRequestID());
+            if (energyRequest != null && energyRequest.requestID() != null && !energyRequest.requestID().trim().isEmpty()) {
+                logger.debug("Forwarding valid energy request with ID '{}' for processing.", energyRequest.requestID());
                 powerPlant.handleIncomingEnergyRequest(energyRequest);
             } else {
                 logger.warn("Invalid or malformed energy request received. Payload: {}", payload);

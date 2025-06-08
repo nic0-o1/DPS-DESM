@@ -118,7 +118,7 @@ public class PowerPlant {
             logger.warn("Received a null energy request. Ignoring.");
             return;
         }
-        logger.info("Facade received Energy Request {} for {} kWh", energyRequest.getRequestID(), energyRequest.getAmountKWh());
+        logger.info("Facade received Energy Request {} for {} kWh", energyRequest.requestID(), energyRequest.amountKWh());
         energyRequestProcessor.processIncomingRequest(energyRequest);
     }
 

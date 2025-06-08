@@ -45,17 +45,17 @@ public class ElectionManager {
 //		performTestSleep();
 		String selfId = powerPlant.getSelfInfo().plantId();
 		double price = powerPlant.isBusy() ? INVALID_BID_PRICE : powerPlant.generatePrice();
-		ElectionState state = stateRepository.getOrCreate(energyRequest.getRequestID(), energyRequest, price);
+		ElectionState state = stateRepository.getOrCreate(energyRequest.requestID(), energyRequest, price);
 
 		if (!state.isValidBid()) {
-			logger.info("Plant {} is BUSY, participating passively in election for request {}", selfId, energyRequest.getRequestID());
+			logger.info("Plant {} is BUSY, participating passively in election for request {}", selfId, energyRequest.requestID());
 			return;
 		}
 		if (state.trySetInitiated()) {
-			logger.info("Plant {} generated price ${} for request {}", selfId, price, energyRequest.getRequestID());
+			logger.info("Plant {} generated price ${} for request {}", selfId, price, energyRequest.requestID());
 			algorithmProcessor.initiate(state);
 		} else {
-			logger.info("Plant {} received duplicate MQTT request for {}", selfId, energyRequest.getRequestID());
+			logger.info("Plant {} received duplicate MQTT request for {}", selfId, energyRequest.requestID());
 		}
 	}
 

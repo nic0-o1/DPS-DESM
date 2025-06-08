@@ -2,8 +2,8 @@ package desm.dps.grpc;
 
 import desm.dps.PowerPlant;
 import desm.dps.PowerPlantInfo;
+import desm.dps.grpc.PlantCommunicationServiceGrpc.PlantCommunicationServiceBlockingStub;
 import io.grpc.ManagedChannel;
-import desm.dps.grpc.PlantCommunicationServiceGrpc.*;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
 import org.slf4j.Logger;

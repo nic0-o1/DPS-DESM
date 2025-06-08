@@ -2,8 +2,8 @@ package desm.dps.core;
 
 import desm.dps.PollutionData;
 import desm.dps.PowerPlantInfo;
-import desm.dps.mqtt.PollutionDataPublisher;
 import desm.dps.SensorManager;
+import desm.dps.mqtt.PollutionDataPublisher;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

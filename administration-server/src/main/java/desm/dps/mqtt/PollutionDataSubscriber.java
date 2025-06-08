@@ -106,7 +106,7 @@ public class PollutionDataSubscriber implements MqttCallback {
 
             if (isValidPollutionData(pollutionData)) {
                 measurementRepository.addPollutionData(pollutionData);
-                logger.debug("Successfully stored pollution data from plant: {}", pollutionData.getPlantId());
+                logger.debug("Successfully stored pollution data from plant: {}", pollutionData.plantId());
             } else {
                 logger.warn("Invalid pollution data received (null or missing plantId): {}", payload);
             }
@@ -116,7 +116,7 @@ public class PollutionDataSubscriber implements MqttCallback {
     }
 
     private boolean isValidPollutionData(PollutionData pollutionData) {
-        return pollutionData != null && pollutionData.getPlantId() != null;
+        return pollutionData != null && pollutionData.plantId() != null;
     }
 
     @Override

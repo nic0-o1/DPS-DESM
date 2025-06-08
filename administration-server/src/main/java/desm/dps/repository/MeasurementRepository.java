@@ -30,19 +30,19 @@ public class MeasurementRepository {
      * @param data The PollutionData object containing plant ID, timestamp, and averages.
      */
     public void addPollutionData(PollutionData data) {
-        if (data == null || data.getPlantId() == null || data.getAverages() == null) {
+        if (data == null || data.plantId() == null || data.averages() == null) {
             logger.warn("Received null or incomplete pollution data. Ignoring.");
             return;
         }
         synchronized (lock) {
             StoredPollutionDataEntry entry = new StoredPollutionDataEntry(
-                    data.getPlantId(),
-                    data.getListComputationTimestamp(),
-                    new ArrayList<>(data.getAverages()) // Store a copy
+                    data.plantId(),
+                    data.listComputationTimestamp(),
+                    new ArrayList<>(data.averages()) // Store a copy
             );
             allPollutionEntries.add(entry);
             logger.info("Stored pollution data from plant {}: {} averages, timestamp {}.",
-                    data.getPlantId(), data.getAverages().size(), data.getListComputationTimestamp());
+                    data.plantId(), data.averages().size(), data.listComputationTimestamp());
         }
     }
 

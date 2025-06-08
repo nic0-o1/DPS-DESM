@@ -36,7 +36,7 @@ public class PollutionDataPublisher {
 
     public void publish(PollutionData data) {
         if (mqttClient == null || !mqttClient.isConnected()) {
-            logger.warn("MQTT client not connected. Cannot publish pollution data for plant {}", data.getPlantId());
+            logger.warn("MQTT client not connected. Cannot publish pollution data for plant {}", data.plantId());
             try {
                 start();
             } catch (MqttException e) {
@@ -46,7 +46,7 @@ public class PollutionDataPublisher {
         }
 
         if (!mqttClient.isConnected()) {
-            logger.error("Still not connected after reconnect attempt. Aborting publish for plant {}", data.getPlantId());
+            logger.error("Still not connected after reconnect attempt. Aborting publish for plant {}", data.plantId());
             return;
         }
 
@@ -57,11 +57,11 @@ public class PollutionDataPublisher {
             message.setQos(QOS);
 
             mqttClient.publish(topic, message);
-            logger.info("Published pollution data for plant {} to topic {}: {}", data.getPlantId(), topic, payload);
+            logger.info("Published pollution data for plant {} to topic {}: {}", data.plantId(), topic, payload);
         } catch (JsonProcessingException e) {
-            logger.error("Error serializing PollutionData for plant {}: {}", data.getPlantId(), e.getMessage());
+            logger.error("Error serializing PollutionData for plant {}: {}", data.plantId(), e.getMessage());
         } catch (MqttException e) {
-            logger.error("Error publishing pollution data for plant {} to topic {}: {}", data.getPlantId(), topic, e.getMessage());
+            logger.error("Error publishing pollution data for plant {} to topic {}: {}", data.plantId(), topic, e.getMessage());
         }
     }
 

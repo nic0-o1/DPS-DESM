@@ -101,7 +101,7 @@ public class EnergyRequestProcessor {
     }
 
     private void startEnergyProduction(EnergyRequest request) {
-        long processingTimeMillis = Math.max(1, (long) request.amountKWh()) * 8; // Simulation logic
+        long processingTimeMillis = request.amountKWh();
         logger.info("Energy production for request {} will take ~{} ms.", request.requestID(), processingTimeMillis);
 
         Thread productionThread = new Thread(() -> {

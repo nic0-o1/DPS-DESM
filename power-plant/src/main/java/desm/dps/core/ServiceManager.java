@@ -100,12 +100,8 @@ public class ServiceManager {
 
     private void stopMqttSubscriber() {
         if (energyRequestSubscriber != null) {
-            try {
-                energyRequestSubscriber.stop();
-                logger.debug("Stopped MQTT subscriber for plant {}", selfInfo.getPlantId());
-            } catch (MqttException e) {
-                logger.warn("Error stopping MQTT subscriber for plant {}: {}", selfInfo.getPlantId(), e.getMessage());
-            }
+            energyRequestSubscriber.stop();
+            logger.debug("Stopped MQTT subscriber for plant {}", selfInfo.getPlantId());
         }
     }
 

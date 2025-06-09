@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Random;
 
 /**
+/**
  * Acts as a Facade for the power plant system. It provides a simplified, high-level interface
  * for starting, stopping, and interacting with the plant, while hiding the complex
  * network of internal components that manage state, services, and processing logic.
@@ -85,7 +86,11 @@ public class PowerPlant {
         }
         logger.info("Starting PowerPlant {}", selfInfo.plantId());
         serviceManager.startServices();
-        registerAndAnnounce();
+        boolean registered = registerAndAnnounce();
+        if (!registered) {
+            // Make the correct lifecycle decision: ABORT STARTUP
+            throw new IllegalStateException("Failed to register with the Admin Server...");
+        }
         // To enable pollution monitoring, uncomment the following line:
 //        pollutionMonitor.start();
         logger.info("PowerPlant {} is fully started and operational.", selfInfo.plantId());
@@ -151,14 +156,16 @@ public class PowerPlant {
      * Registers this plant with the central admin server and announces its presence
      * to other plants discovered in the process.
      */
-    private void registerAndAnnounce() {
+    private boolean registerAndAnnounce() {
         List<PowerPlantInfo> initialOtherPlants = adminClient.register(selfInfo);
         if (initialOtherPlants != null && !initialOtherPlants.isEmpty()) {
             plantRegistry.addInitialPlants(initialOtherPlants);
             logger.info("Registered with Admin Server. Discovered {} other plants.", plantRegistry.getOtherPlantsCount());
             serviceManager.announcePresenceTo(plantRegistry.getOtherPlantsSnapshot());
+            return true;
         } else {
             logger.warn("Registration with Admin Server yielded no other plants.");
+            return false;
         }
     }
 

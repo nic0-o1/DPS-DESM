@@ -32,7 +32,6 @@ public class PlantService {
      * @return true if the plant was successfully registered, false if data is invalid or a plant with the same ID already exists.
      */
     public boolean registerPlant(PowerPlantInfo plantInfo) {
-        // Service layer validation for business rules and data integrity
         if (plantInfo == null) {
             logger.warn("Attempted to register a null plantInfo object.");
             return false;
@@ -51,13 +50,10 @@ public class PlantService {
         }
 
         logger.info("Attempting to register plant with ID: {}", plantInfo.plantId());
-        // The repository's registerPlant method handles the check for pre-existing ID
         boolean success = plantRepository.registerPlant(plantInfo);
         if (success) {
             logger.info("Successfully registered plant: {}", plantInfo.plantId());
         } else {
-            // This 'else' will now predominantly mean the plant ID already exists,
-            // as other validations are handled above.
             logger.warn("Failed to register plant: ID {} already exists or another repository issue occurred.", plantInfo.plantId());
         }
         return success;
@@ -80,6 +76,6 @@ public class PlantService {
         } else {
             logger.info("Found plant with ID {}: {}", plantId, plant);
         }
-        return plant; // Directly return the object or null
+        return plant;
     }
 }

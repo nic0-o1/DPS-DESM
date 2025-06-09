@@ -4,12 +4,10 @@ import java.util.Objects;
 
 /**
  * Represents the connection information for a power plant.
- * <p>
  * This class has been refactored to be an immutable data object.
  * 1.  All fields are 'private final' to ensure they cannot be changed after construction.
  * 2.  Setters have been removed.
  * 3.  Validation is performed in the constructor to ensure an object can never be in an invalid state ("fail-fast").
- * <p>
  * The method names `getPlantId()`, `getAddress()`, etc., are preserved for backward compatibility.
  */
 public record PowerPlantInfo(String plantId, String address,

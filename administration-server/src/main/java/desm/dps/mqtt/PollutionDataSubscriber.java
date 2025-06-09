@@ -93,7 +93,6 @@ public class PollutionDataSubscriber implements MqttCallback {
     public void connectionLost(Throwable cause) {
         logger.error("MQTT connection lost for PollutionDataSubscriber (client {}): {}",
                 clientId, cause.getMessage(), cause);
-        // Automatic reconnect should handle this if enabled
     }
 
     @Override

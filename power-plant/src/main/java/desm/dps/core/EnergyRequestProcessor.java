@@ -11,7 +11,7 @@ import java.util.Queue;
 /**
  * Manages the state and processing logic for energy requests. This class encapsulates
  * the "busy" state of the plant, a queue for pending requests, and the logic
- * for simulating energy production. It is designed to be thread-safe.
+ * for simulating energy production.
  */
 public class EnergyRequestProcessor {
     private static final Logger logger = LoggerFactory.getLogger(EnergyRequestProcessor.class);
@@ -41,7 +41,6 @@ public class EnergyRequestProcessor {
     public void processIncomingRequest(EnergyRequest energyRequest) {
         boolean processedImmediately;
         synchronized (processingLock) {
-            // If not busy, we can process this immediately.
             if (!isBusy) {
                 electionManager.processNewEnergyRequest(energyRequest);
                 processedImmediately = true;
@@ -51,7 +50,7 @@ public class EnergyRequestProcessor {
         }
 
         if (!processedImmediately) {
-            // If we were busy, queue the request.
+            // if busy, queue the request
             synchronized (pendingRequestsLock) {
                 pendingRequests.add(energyRequest);
                 logger.info("Plant {} is busy. Queued request {}. Queue size: {}",
@@ -130,13 +129,11 @@ public class EnergyRequestProcessor {
             nextRequest = pendingRequests.poll(); // Dequeue if present
         }
 
-        // Clear the busy state to allow new requests to be processed.
         synchronized (processingLock) {
             isBusy = false;
             currentRequestId = null;
         }
 
-        // If there was a pending request, process it now.
         if (nextRequest != null) {
             logger.info("Processing dequeued request {}.", nextRequest.requestID());
             processIncomingRequest(nextRequest);

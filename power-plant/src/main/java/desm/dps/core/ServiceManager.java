@@ -119,21 +119,21 @@ public class ServiceManager {
         }
     }
 
-    /**
-     * A utility method to safely interrupt and join a thread.
-     *
-     * @param thread     The thread to stop.
-     * @param threadName A descriptive name for logging.
-     * @param plantId    The ID of the plant for logging context.
-     */
-    public static void interruptAndJoinThread(Thread thread, String threadName, String plantId) {
-        if (thread == null) return;
-        thread.interrupt();
-        try {
-            thread.join(THREAD_JOIN_TIMEOUT_MS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            logger.warn("Interrupted while joining {} thread for plant {}.", threadName, plantId);
-        }
-    }
+//    /**
+//     * A utility method to safely interrupt and join a thread.
+//     *
+//     * @param thread     The thread to stop.
+//     * @param threadName A descriptive name for logging.
+//     * @param plantId    The ID of the plant for logging context.
+//     */
+//    public static void interruptAndJoinThread(Thread thread, String threadName, String plantId) {
+//        if (thread == null) return;
+//        thread.interrupt();
+//        try {
+//            thread.join(THREAD_JOIN_TIMEOUT_MS);
+//        } catch (InterruptedException e) {
+//            Thread.currentThread().interrupt();
+//            logger.warn("Interrupted while joining {} thread for plant {}.", threadName, plantId);
+//        }
+//    }
 }

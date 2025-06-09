@@ -27,7 +27,7 @@ public class PollutionMonitor {
 
     public PollutionMonitor(PowerPlantInfo selfInfo, String mqttBrokerUrl, String pollutionTopic) {
         this.selfInfo = selfInfo;
-        this.sensorManager = new SensorManager();
+        this.sensorManager = new SensorManager(selfInfo.plantId() + "-PollutionMonitor");
         this.pollutionDataPublisher = new PollutionDataPublisher(mqttBrokerUrl, selfInfo.plantId(), pollutionTopic);
     }
 
@@ -54,11 +54,9 @@ public class PollutionMonitor {
         if (!shouldPublish && publisherThread == null) return; // Already stopped
         logger.info("Stopping pollution monitoring for plant {}.", selfInfo.plantId());
         shouldPublish = false;
-        ServiceManager.interruptAndJoinThread(publisherThread, "pollution publisher", selfInfo.plantId());
 
         if (sensorManager != null) {
             sensorManager.stopManager();
-            ServiceManager.interruptAndJoinThread(sensorManager, "SensorManager", selfInfo.plantId());
         }
         if (pollutionDataPublisher != null) {
             pollutionDataPublisher.stop();

@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /**
  * A facade for the election system. It orchestrates the election process by delegating
@@ -23,7 +22,6 @@ import java.util.concurrent.TimeUnit;
 public class ElectionManager {
 	private static final Logger logger = LoggerFactory.getLogger(ElectionManager.class);
 	private static final double INVALID_BID_PRICE = -1.0;
-	private static final int TEST_SLEEP_DURATION_MS = 22000;
 
 	private final PowerPlant powerPlant;
 	private final ElectionStateRepository stateRepository;
@@ -42,7 +40,6 @@ public class ElectionManager {
 	 * Main entry point to process a new energy request.
 	 */
 	public void processNewEnergyRequest(EnergyRequest energyRequest) {
-//		performTestSleep();
 		String selfId = powerPlant.getSelfInfo().plantId();
 		double price = powerPlant.isBusy() ? INVALID_BID_PRICE : powerPlant.generatePrice();
 		ElectionState state = stateRepository.getOrCreate(energyRequest.requestID(), energyRequest, price);
@@ -105,21 +102,5 @@ public class ElectionManager {
 		}
 	}
 
-	public void shutdown() {
-		cleanupExecutor.shutdown();
-		try { if (!cleanupExecutor.awaitTermination(5, TimeUnit.SECONDS)) { cleanupExecutor.shutdownNow(); } }
-		catch (InterruptedException e) { cleanupExecutor.shutdownNow(); Thread.currentThread().interrupt(); }
-	}
 
-	private void performTestSleep() {
-		String selfId = powerPlant.getSelfInfo().plantId();
-		try {
-			logger.warn(">>> [TEST-ONLY] PLANT {} PAUSING FOR {} SECONDS BEFORE ELECTION <<<", selfId, TEST_SLEEP_DURATION_MS / 1000);
-			Thread.sleep(TEST_SLEEP_DURATION_MS);
-			logger.warn(">>> [TEST-ONLY] PLANT {} RESUMING... <<<", selfId);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			logger.error("Test sleep was interrupted", e);
-		}
-	}
 }

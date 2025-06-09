@@ -5,10 +5,9 @@ import desm.dps.grpc.Bid;
 /**
  * A stateless utility class for comparing two bids.
  * A bid is "better" if its price is lower. In case of a tie, the bid from the
- * plant with the lexicographically smaller ID wins.
+ * plant with the lexicographically bigger ID wins.
  */
 public final class BidComparator {
-    // Private constructor to prevent instantiation.
     private BidComparator() {}
 
     public static boolean isBetter(Bid candidate, Bid current) {
@@ -19,8 +18,8 @@ public final class BidComparator {
         // Lower price wins.
         if (candidate.getPrice() < current.getPrice()) return true;
 
-        // If prices are equal, the smaller Plant ID wins as a tie-breaker.
+        // If prices are equal, the bigger Plant ID wins as a tie-breaker.
         return candidate.getPrice() == current.getPrice() &&
-                candidate.getPlantId().compareTo(current.getPlantId()) < 0;
+                candidate.getPlantId().compareTo(current.getPlantId()) > 0;
     }
 }

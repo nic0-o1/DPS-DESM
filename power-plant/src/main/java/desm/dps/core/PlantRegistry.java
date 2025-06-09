@@ -10,8 +10,6 @@ import java.util.List;
 
 /**
  * Manages the list of known power plants and the logical ring topology used for communication.
- * This class is thread-safe and encapsulates all operations on the plant network,
- * including an efficient caching mechanism for ring lookups.
  */
 public class PlantRegistry {
     private static final Logger logger = LoggerFactory.getLogger(PlantRegistry.class);
@@ -29,7 +27,7 @@ public class PlantRegistry {
     }
 
     /**
-     * Adds a list of newly discovered plants, typically from the admin server on startup.
+     * Adds a list of newly discovered plants from the admin server.
      *
      * @param initialPlants The list of plants to add.
      */
@@ -40,7 +38,7 @@ public class PlantRegistry {
                     otherPlantsList.add(plant);
                 }
             }
-            sortAndInvalidateCacheUnsafe();
+            sortAndInvalidateCache();
         }
     }
 
@@ -58,7 +56,7 @@ public class PlantRegistry {
                 return;
             }
             otherPlantsList.add(newPlant);
-            sortAndInvalidateCacheUnsafe();
+            sortAndInvalidateCache();
             logger.debug("Added new plant {}. Total known other plants: {}", newPlant.plantId(), otherPlantsList.size());
         }
     }
@@ -74,7 +72,7 @@ public class PlantRegistry {
         }
         synchronized (lock) {
             if (otherPlantsList.removeIf(plant -> plant.plantId().equals(plantId))) {
-                sortAndInvalidateCacheUnsafe();
+                sortAndInvalidateCache();
                 logger.debug("Removed plant {}. Total known other plants: {}", plantId, otherPlantsList.size());
             }
         }
@@ -99,7 +97,7 @@ public class PlantRegistry {
         synchronized (lock) {
             ring = this.cachedRingArray; // Double-check after acquiring lock
             if (ring == null) {
-                ring = buildCompleteRingUnsafe();
+                ring = buildCompleteRing();
                 this.cachedRingArray = ring;
             }
             return findNextInArray(ring, currentPlantId);
@@ -127,18 +125,18 @@ public class PlantRegistry {
         }
     }
 
-    // --- Unsafe helpers (must be called within a synchronized block) ---
+    // --- Unsafe helpers ---
 
     private boolean plantExistsUnsafe(String plantId) {
         return otherPlantsList.stream().anyMatch(p -> p.plantId().equals(plantId));
     }
 
-    private void sortAndInvalidateCacheUnsafe() {
+    private void sortAndInvalidateCache() {
         otherPlantsList.sort(Comparator.comparing(PowerPlantInfo::plantId));
         this.cachedRingArray = null; // Invalidate cache on any modification
     }
 
-    private PowerPlantInfo[] buildCompleteRingUnsafe() {
+    private PowerPlantInfo[] buildCompleteRing() {
         List<PowerPlantInfo> allPlants = new ArrayList<>(otherPlantsList.size() + 1);
         allPlants.addAll(otherPlantsList);
         allPlants.add(selfInfo);
@@ -156,6 +154,6 @@ public class PlantRegistry {
             logger.warn("Plant {} not found in ring. Defaulting to first plant.", currentPlantId);
             return ring[0];
         }
-        return selfInfo; // Fallback to self if ring is empty
+        return selfInfo;
     }
 }

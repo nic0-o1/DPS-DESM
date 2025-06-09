@@ -28,7 +28,6 @@ public class ElectionCommunicator {
 
     /**
      * Broadcasts the winner of an election to all other known plants.
-     * This logic is identical to the original implementation.
      */
     public void broadcastWinner(String requestId, Bid winnerBid) {
         EnergyWinnerAnnouncement announcement = EnergyWinnerAnnouncement.newBuilder()
@@ -38,9 +37,7 @@ public class ElectionCommunicator {
                 .build();
 
         for (PowerPlantInfo plant : powerPlant.getOtherPlants()) {
-            // Your original logic did not send the announcement to itself, which is correct.
-            // This loop over `getOtherPlants()` naturally achieves that.
-            if (!plant.plantId().equals(powerPlant.getSelfInfo().plantId())) {
+            if (plant.plantId() != powerPlant.getSelfInfo().plantId()) {
                 grpcClient.announceEnergyWinner(plant, announcement);
             }
         }

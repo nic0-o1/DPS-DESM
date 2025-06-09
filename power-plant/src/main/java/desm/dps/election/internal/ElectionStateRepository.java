@@ -12,7 +12,6 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Manages the storage and lifecycle of ElectionState objects.
- * This class is thread-safe and encapsulates all access to the central map of ongoing elections.
  */
 public class ElectionStateRepository {
     private static final Logger logger = LoggerFactory.getLogger(ElectionStateRepository.class);
@@ -40,7 +39,6 @@ public class ElectionStateRepository {
 
     /**
      * Safely retrieves an existing election state. Returns null if not found.
-     * This mirrors the logic of the original working implementation.
      */
     public ElectionState get(String requestId) {
         synchronized (electionsLock) {

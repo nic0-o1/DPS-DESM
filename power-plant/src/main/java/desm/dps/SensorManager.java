@@ -28,7 +28,8 @@ public class SensorManager extends Thread {
     private final Object windowLock = new Object();
     private volatile boolean stopCondition = false;
 
-    public SensorManager() {
+    public SensorManager(String name) {
+        super(name);
         this.rawMeasurementBuffer = new MeasurementBuffer();
         this.pollutionSensor = new PollutionSensor(this.rawMeasurementBuffer);
         this.currentWindow = new ArrayList<>();

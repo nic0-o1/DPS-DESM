@@ -86,6 +86,7 @@ public class PowerPlant {
         logger.info("Starting PowerPlant {}", selfInfo.plantId());
             serviceManager.startServices();
             registerAndAnnounce();
+            // To enable pollution monitoring, uncomment the following line:
             pollutionMonitor.start();
             logger.info("PowerPlant {} is fully started and operational.", selfInfo.plantId());
     }

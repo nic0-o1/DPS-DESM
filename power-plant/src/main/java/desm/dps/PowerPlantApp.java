@@ -40,8 +40,8 @@ public class PowerPlantApp {
 
         AppConfig config = AppConfig.getInstance();
 
-        String plantId = "001";
-        int plantPort = 56001;
+        String plantId = "002";
+        int plantPort = 56002;
 
         String adminServerBaseUrl = config.getAdminServerBaseUrl();
         String mqttBrokerUrl = config.getMqttBrokerUrl();

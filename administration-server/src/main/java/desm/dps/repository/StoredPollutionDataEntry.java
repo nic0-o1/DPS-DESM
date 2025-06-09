@@ -1,4 +1,4 @@
-package desm.dps;
+package desm.dps.repository;
 
 import java.util.List;
 

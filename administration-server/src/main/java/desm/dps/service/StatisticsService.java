@@ -10,7 +10,6 @@ public class StatisticsService {
     private static final Logger logger = LoggerFactory.getLogger(StatisticsService.class);
     private final MeasurementRepository measurementRepository;
 
-    // Constructor injection for dependencies
     public StatisticsService(MeasurementRepository measurementRepository) {
         this.measurementRepository = measurementRepository;
     }

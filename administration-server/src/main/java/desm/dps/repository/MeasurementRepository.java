@@ -1,7 +1,6 @@
 package desm.dps.repository;
 
 import desm.dps.PollutionData;
-import desm.dps.StoredPollutionDataEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
@@ -16,10 +15,8 @@ import java.util.List;
 public class MeasurementRepository {
     private static final Logger logger = LoggerFactory.getLogger(MeasurementRepository.class);
 
-    // Stores pollution data entries. Each plant ID maps to a list of its reported data batches.
-    // Using a simple List<StoredPollutionDataEntry> for all entries, as queries span all plants.
     private final List<StoredPollutionDataEntry> allPollutionEntries;
-    private final Object lock = new Object(); // For synchronizing access to allPollutionEntries [cite: 116]
+    private final Object lock = new Object();
 
     public MeasurementRepository() {
         allPollutionEntries = new ArrayList<>();
@@ -38,7 +35,7 @@ public class MeasurementRepository {
             StoredPollutionDataEntry entry = new StoredPollutionDataEntry(
                     data.plantId(),
                     data.listComputationTimestamp(),
-                    new ArrayList<>(data.averages()) // Store a copy
+                    new ArrayList<>(data.averages())
             );
             allPollutionEntries.add(entry);
             logger.info("Stored pollution data from plant {}: {} averages, timestamp {}.",
@@ -70,7 +67,6 @@ public class MeasurementRepository {
                         entry.plantId(), entry.listComputationTimestamp(),
                         inRange);
                 if (inRange) {
-                    // Calculate the average of this emission level (list of averages)
                     if (!entry.averages().isEmpty()) {
                         double sum = 0;
                         for (Double value : entry.averages()) {

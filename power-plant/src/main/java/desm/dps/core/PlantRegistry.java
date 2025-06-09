@@ -34,7 +34,7 @@ public class PlantRegistry {
     public void addInitialPlants(List<PowerPlantInfo> initialPlants) {
         synchronized (lock) {
             for (PowerPlantInfo plant : initialPlants) {
-                if (!plant.plantId().equals(selfInfo.plantId()) && !plantExistsUnsafe(plant.plantId())) {
+                if (plant.plantId() != selfInfo.plantId() && !plantExistsUnsafe(plant.plantId())) {
                     otherPlantsList.add(plant);
                 }
             }
@@ -48,7 +48,7 @@ public class PlantRegistry {
      * @param newPlant The plant to add.
      */
     public void addPlant(PowerPlantInfo newPlant) {
-        if (newPlant == null || newPlant.plantId().equals(selfInfo.plantId())) {
+        if (newPlant == null || newPlant.plantId() == selfInfo.plantId()) {
             return;
         }
         synchronized (lock) {
@@ -66,12 +66,9 @@ public class PlantRegistry {
      *
      * @param plantId The ID of the plant to remove.
      */
-    public void removePlant(String plantId) {
-        if (plantId == null || plantId.isEmpty()) {
-            return;
-        }
+    public void removePlant(int plantId) {
         synchronized (lock) {
-            if (otherPlantsList.removeIf(plant -> plant.plantId().equals(plantId))) {
+            if (otherPlantsList.removeIf(plant -> plant.plantId() == plantId)) {
                 sortAndInvalidateCache();
                 logger.debug("Removed plant {}. Total known other plants: {}", plantId, otherPlantsList.size());
             }
@@ -83,9 +80,10 @@ public class PlantRegistry {
      * This method is highly optimized for reads using a lock-free cache.
      *
      * @param currentPlantId The ID of the plant from which to find the next one.
+     *                       Using Integer allows for a null value to represent an initial state.
      * @return The {@link PowerPlantInfo} of the next plant in the ring.
      */
-    public PowerPlantInfo getNextInRing(String currentPlantId) {
+    public PowerPlantInfo getNextInRing(Integer currentPlantId) {
         if (currentPlantId == null) {
             return selfInfo;
         }
@@ -127,8 +125,8 @@ public class PlantRegistry {
 
     // --- Unsafe helpers ---
 
-    private boolean plantExistsUnsafe(String plantId) {
-        return otherPlantsList.stream().anyMatch(p -> p.plantId().equals(plantId));
+    private boolean plantExistsUnsafe(int plantId) {
+        return otherPlantsList.stream().anyMatch(p -> p.plantId() == plantId);
     }
 
     private void sortAndInvalidateCache() {
@@ -144,9 +142,9 @@ public class PlantRegistry {
         return allPlants.toArray(new PowerPlantInfo[0]);
     }
 
-    private PowerPlantInfo findNextInArray(PowerPlantInfo[] ring, String currentPlantId) {
+    private PowerPlantInfo findNextInArray(PowerPlantInfo[] ring, int currentPlantId) {
         for (int i = 0; i < ring.length; i++) {
-            if (ring[i].plantId().equals(currentPlantId)) {
+            if (ring[i].plantId() == currentPlantId) {
                 return ring[(i + 1) % ring.length]; // Wrap around
             }
         }

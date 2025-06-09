@@ -27,7 +27,8 @@ public class MeasurementRepository {
      * @param data The PollutionData object containing plant ID, timestamp, and averages.
      */
     public void addPollutionData(PollutionData data) {
-        if (data == null || data.plantId() == null || data.averages() == null) {
+        // Since plantId is now a primitive int, it cannot be null.
+        if (data == null || data.averages() == null) {
             logger.warn("Received null or incomplete pollution data. Ignoring.");
             return;
         }

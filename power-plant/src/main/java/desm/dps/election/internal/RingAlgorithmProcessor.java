@@ -40,7 +40,7 @@ public final class RingAlgorithmProcessor {
      * @param state The state object for the election being initiated.
      */
     public void initiate(ElectionState state) {
-        String selfId = powerPlant.getSelfInfo().plantId();
+        int selfId = powerPlant.getSelfInfo().plantId();
 
         // Create this plant's own bid for the energy request.
         Bid myBid = createBid(selfId, state.getMyBid());
@@ -54,7 +54,7 @@ public final class RingAlgorithmProcessor {
 
         // Handle the edge case of a single-node ring. If this plant is the only one,
         // the election completes immediately.
-        if (nextPlant == null || nextPlant.plantId().equals(selfId)) {
+        if (nextPlant == null || nextPlant.plantId() == selfId) {
             complete(state, token);
             return;
         }
@@ -112,7 +112,7 @@ public final class RingAlgorithmProcessor {
         // Atomically check and set the "winner announced" flag. This prevents duplicate announcements
         if (state.trySetWinnerAnnounced()) {
             // Check if this plant is the winner.
-            if (winnerBid.getPlantId().equals(powerPlant.getSelfInfo().plantId())) {
+            if (winnerBid.getPlantId() == powerPlant.getSelfInfo().plantId()) {
                 // If so, trigger the business logic to fulfill the request.
                 powerPlant.fulfillEnergyRequest(state.getRequest(), winnerBid.getPrice());
             }
@@ -128,14 +128,14 @@ public final class RingAlgorithmProcessor {
     /**
      * Private helper to create a gRPC Bid message.
      */
-    private Bid createBid(String plantId, double price) {
+    private Bid createBid(int plantId, double price) {
         return Bid.newBuilder().setPlantId(plantId).setPrice(price).build();
     }
 
     /**
      * Private helper to create the initial gRPC election token.
      */
-    private ElectCoordinatorToken createToken(String selfId, ElectionState state, Bid bestBid) {
+    private ElectCoordinatorToken createToken(int selfId, ElectionState state, Bid bestBid) {
         return ElectCoordinatorToken.newBuilder()
                 .setInitiatorId(selfId)
                 .setEnergyRequestId(state.getRequest().requestID())

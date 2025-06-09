@@ -40,7 +40,7 @@ public class ElectionManager {
 	 * Main entry point to process a new energy request.
 	 */
 	public void processNewEnergyRequest(EnergyRequest energyRequest) {
-		String selfId = powerPlant.getSelfInfo().plantId();
+		int selfId = powerPlant.getSelfInfo().plantId();
 		double price = powerPlant.isBusy() ? INVALID_BID_PRICE : powerPlant.generatePrice();
 		ElectionState state = stateRepository.getOrCreate(energyRequest.requestID(), energyRequest, price);
 
@@ -69,7 +69,7 @@ public class ElectionManager {
 			logger.debug("Plant {} dropping token for request {}, winner already announced", powerPlant.getSelfInfo().plantId(), token.getEnergyRequestId());
 			return;
 		}
-		if (powerPlant.getSelfInfo().plantId().equals(token.getInitiatorId())) {
+		if (powerPlant.getSelfInfo().plantId() == token.getInitiatorId()) {
 			if (algorithmProcessor.complete(state, token)) {
 				stateRepository.scheduleCleanup(token.getEnergyRequestId());
 			}
@@ -83,9 +83,9 @@ public class ElectionManager {
 	 * This logic is now identical to the original working implementation.
 	 */
 	public void processEnergyWinnerAnnouncement(EnergyWinnerAnnouncement announcement) {
-		String selfId = powerPlant.getSelfInfo().plantId();
+		int selfId = powerPlant.getSelfInfo().plantId();
 		String requestId = announcement.getEnergyRequestId();
-		String winnerId = announcement.getWinningPlantId();
+		int winnerId = announcement.getWinningPlantId();
 
 		ElectionState state = stateRepository.get(requestId);
 		if (state == null) {
@@ -94,7 +94,7 @@ public class ElectionManager {
 		}
 		if (state.trySetWinnerAnnounced()) {
 			logger.info("Plant {} acknowledges winner {} for request {} at ${}", selfId, winnerId, requestId, announcement.getWinningPrice());
-			if (winnerId.equals(selfId)) {
+			if (winnerId == selfId) {
 				logger.info("Plant {} is the winner! Fulfilling request {}", selfId, requestId);
 				powerPlant.fulfillEnergyRequest(state.getRequest(), announcement.getWinningPrice());
 			}

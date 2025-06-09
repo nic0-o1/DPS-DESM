@@ -126,7 +126,7 @@ public class ServiceManager {
 //     * @param threadName A descriptive name for logging.
 //     * @param plantId    The ID of the plant for logging context.
 //     */
-//    public static void interruptAndJoinThread(Thread thread, String threadName, String plantId) {
+//    public static void interruptAndJoinThread(Thread thread, String threadName, int plantId) {
 //        if (thread == null) return;
 //        thread.interrupt();
 //        try {

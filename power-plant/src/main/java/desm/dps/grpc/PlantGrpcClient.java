@@ -15,8 +15,8 @@ import java.util.concurrent.TimeUnit;
 
 public class PlantGrpcClient {
 	private static final Logger logger = LoggerFactory.getLogger(PlantGrpcClient.class);
-	private final Map<String, PlantCommunicationServiceBlockingStub> blockingStubs = new HashMap<>();
-	private final Map<String, ManagedChannel> channels = new HashMap<>();
+	private final Map<Integer, PlantCommunicationServiceBlockingStub> blockingStubs = new HashMap<>();
+	private final Map<Integer, ManagedChannel> channels = new HashMap<>();
 	private final PowerPlant powerPlant;
 
 	public PlantGrpcClient(PowerPlant powerPlant) {
@@ -24,7 +24,7 @@ public class PlantGrpcClient {
 	}
 
 	private PlantCommunicationServiceBlockingStub getBlockingStub(PowerPlantInfo targetPlant) {
-		String targetId = targetPlant.plantId();
+		int targetId = targetPlant.plantId();
 		if (!blockingStubs.containsKey(targetId)) {
 			ManagedChannel channel = ManagedChannelBuilder.forAddress(targetPlant.address(), targetPlant.port())
 					.usePlaintext()
@@ -63,7 +63,7 @@ public class PlantGrpcClient {
 			logger.info("Forwarding token to {} for ER {} (Best Bid: {} @ ${})",
 					targetPlant.plantId(),
 					token.getEnergyRequestId(),
-					token.getBestBid().getPlantId().isEmpty() ? "None" : token.getBestBid().getPlantId(),
+					token.getBestBid().getPlantId() == 0 ? "None" : token.getBestBid().getPlantId(),
 					token.getBestBid().getPrice()
 			);
 

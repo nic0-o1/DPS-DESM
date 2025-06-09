@@ -107,7 +107,7 @@ public class PollutionDataSubscriber implements MqttCallback {
                 measurementRepository.addPollutionData(pollutionData);
                 logger.debug("Successfully stored pollution data from plant: {}", pollutionData.plantId());
             } else {
-                logger.warn("Invalid pollution data received (null or missing plantId): {}", payload);
+                logger.warn("Invalid pollution data received (null object): {}", payload);
             }
         } catch (Exception e) {
             logger.error("Error processing MQTT message on topic {}: {}", topic, e.getMessage(), e);
@@ -115,7 +115,9 @@ public class PollutionDataSubscriber implements MqttCallback {
     }
 
     private boolean isValidPollutionData(PollutionData pollutionData) {
-        return pollutionData != null && pollutionData.plantId() != null;
+        // Since plantId is now a primitive int, it cannot be null.
+        // We only need to check if the overall object was successfully deserialized.
+        return pollutionData != null;
     }
 
     @Override

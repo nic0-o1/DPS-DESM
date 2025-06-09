@@ -22,6 +22,8 @@ public class MeasurementBuffer implements Buffer {
 
     /**
      * Reads all current measurements from the buffer and then clears the buffer.
+     * This method is synchronized to ensure thread-safe access and modification
+     * of the internal measurements list. [cite: 82, 83]
      * @return A list containing all measurements that were in the buffer.
      */
     @Override

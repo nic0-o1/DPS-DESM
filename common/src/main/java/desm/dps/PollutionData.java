@@ -14,7 +14,7 @@ import java.util.Objects;
  * 3.  'Long listComputationTimestamp' was replaced with 'Instant' for better type safety.
  * 4.  equals() and hashCode() have been added.
  */
-public record PollutionData(String plantId, long listComputationTimestamp, List<Double> averages) {
+public record PollutionData(int plantId, long listComputationTimestamp, List<Double> averages) {
     /**
      * Note on the no-arg constructor:
      * The original no-arg constructor was likely for a framework like Jackson. It has been removed
@@ -23,9 +23,9 @@ public record PollutionData(String plantId, long listComputationTimestamp, List<
      * If using an older version, you may need to add back a private no-arg constructor and use
      * field-based deserialization.
      */
-    public PollutionData(String plantId, long listComputationTimestamp, List<Double> averages) {
+    public PollutionData(int plantId, long listComputationTimestamp, List<Double> averages) {
         // --- Validation ---
-        this.plantId = Objects.requireNonNull(plantId, "plantId cannot be null");
+        this.plantId = plantId;
         this.listComputationTimestamp = listComputationTimestamp;
         Objects.requireNonNull(averages, "averages list cannot be null");
 

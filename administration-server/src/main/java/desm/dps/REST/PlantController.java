@@ -50,7 +50,7 @@ public class PlantController {
 
             if (registered) {
                 logger.info("Plant registered successfully: {}", plantInfo.plantId());
-                // Return 201 Created with the resource, but no Location header
+                // Return 201 Created with the list of all plants
                 return ResponseEntity.status(HttpStatus.CREATED).body(plantService.getAllPlants());
             } else {
                 // Determine if it's a conflict (already exists) or bad data rejected by service
@@ -59,27 +59,22 @@ public class PlantController {
                     return ResponseEntity.status(HttpStatus.CONFLICT).body("Plant with ID '" + plantInfo.plantId() + "' already exists.");
                 } else {
                     // If not a conflict, it means the service rejected it due to invalid data
-                    // (e.g., empty address, invalid port, etc., as checked in PlantService)
                     logger.warn("Bad request: Plant data for ID {} was invalid as per service validation.", plantInfo.plantId());
                     return ResponseEntity.badRequest().body("Invalid plant data. Please check ID, address, and port requirements.");
                 }
             }
         } catch (Exception e) {
-            logger.error("Error processing request to register plant {}: {}", (plantInfo != null && plantInfo.plantId() != null ? plantInfo.plantId() : "unknown_id"), e.getMessage(), e);
+            logger.error("Error processing request to register plant {}: {}", plantInfo.plantId(), e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An internal server error occurred while registering the plant.");
         }
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getPlantById(@PathVariable String id) {
+    public ResponseEntity<?> getPlantById(@PathVariable int id) {
         try {
             logger.info("Received request to get plant by ID: {}", id);
-            if (id == null || id.trim().isEmpty()) {
-                logger.warn("Request for plant with null or empty ID.");
-                return ResponseEntity.badRequest().body("Plant ID cannot be null or empty.");
-            }
 
-            PowerPlantInfo plant = plantService.getPlantById(id); // Directly gets PowerPlantInfo or null
+            PowerPlantInfo plant = plantService.getPlantById(id);
 
             if (plant != null) {
                 logger.info("Plant found with ID {}: {}", id, plant);

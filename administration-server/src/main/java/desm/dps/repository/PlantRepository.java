@@ -12,7 +12,7 @@ import java.util.List;
 public class PlantRepository {
     private static final Logger logger = LoggerFactory.getLogger(PlantRepository.class);
 
-    private final HashMap<String, PowerPlantInfo> registeredPlants = new HashMap<>();
+    private final HashMap<Integer, PowerPlantInfo> registeredPlants = new HashMap<>();
 
     public synchronized boolean registerPlant(PowerPlantInfo toRegister) {
         if (registeredPlants.containsKey(toRegister.plantId())) {
@@ -23,7 +23,7 @@ public class PlantRepository {
         return true;
     }
 
-    public synchronized PowerPlantInfo getPlantById(String plantId) {
+    public synchronized PowerPlantInfo getPlantById(int plantId) {
         return registeredPlants.get(plantId);
     }
 

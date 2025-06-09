@@ -20,7 +20,9 @@ public final class ElectionState {
     public ElectionState(EnergyRequest request, double myBid) {
         this.request = request;
         this.myBid = myBid;
-        this.bestBidSeen = Bid.newBuilder().setPlantId("").setPrice(Double.MAX_VALUE).build();
+        // Initialize with a placeholder bid that any valid bid can beat.
+        // A plant ID of 0 is considered invalid/placeholder.
+        this.bestBidSeen = Bid.newBuilder().setPlantId(0).setPrice(Double.MAX_VALUE).build();
     }
 
     public boolean updateBestBid(Bid newBid) {

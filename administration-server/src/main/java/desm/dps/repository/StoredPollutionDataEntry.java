@@ -7,5 +7,5 @@ import java.util.List;
  * @param listComputationTimestamp Timestamp when the plant computed this list of averages
  * @param averages                 The list of CO2 averages
  */
-public record StoredPollutionDataEntry(String plantId, long listComputationTimestamp, List<Double> averages) {
+public record StoredPollutionDataEntry(int plantId, long listComputationTimestamp, List<Double> averages) {
 }

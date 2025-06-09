@@ -17,7 +17,15 @@ public class PowerPlantApp {
 //
 //        System.out.println("===== Power Plant Configuration =====");
 //        System.out.print("Enter Plant ID: ");
-//        String plantId = scanner.nextLine().trim();
+//        int plantId;
+//        try {
+//            plantId = Integer.parseInt(scanner.nextLine().trim());
+//        } catch (NumberFormatException e) {
+//            System.err.println("Error: Plant ID must be a valid integer");
+//            scanner.close();
+//            System.exit(1);
+//            return;
+//        }
 //
 //        System.out.print("Enter gRPC Host: ");
 //        String grpcHost = scanner.nextLine().trim();
@@ -40,7 +48,7 @@ public class PowerPlantApp {
 
         AppConfig config = AppConfig.getInstance();
 
-        String plantId = "002";
+        int plantId = 2;
         int plantPort = 56002;
 
         String adminServerBaseUrl = config.getAdminServerBaseUrl();

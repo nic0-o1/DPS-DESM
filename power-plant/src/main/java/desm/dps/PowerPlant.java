@@ -84,11 +84,11 @@ public class PowerPlant {
             throw new IllegalStateException("Cannot start a shutdown PowerPlant.");
         }
         logger.info("Starting PowerPlant {}", selfInfo.plantId());
-            serviceManager.startServices();
-            registerAndAnnounce();
-            // To enable pollution monitoring, uncomment the following line:
-            pollutionMonitor.start();
-            logger.info("PowerPlant {} is fully started and operational.", selfInfo.plantId());
+        serviceManager.startServices();
+        registerAndAnnounce();
+        // To enable pollution monitoring, uncomment the following line:
+//        pollutionMonitor.start();
+        logger.info("PowerPlant {} is fully started and operational.", selfInfo.plantId());
     }
 
     /**
@@ -176,7 +176,7 @@ public class PowerPlant {
      * Removes a plant from the internal registry, typically after it goes offline.
      * @param plantId The ID of the plant to remove.
      */
-    public void removeOtherPlant(String plantId) {
+    public void removeOtherPlant(int plantId) {
         plantRegistry.removePlant(plantId);
     }
 
@@ -185,7 +185,7 @@ public class PowerPlant {
      * @param currentPlantId The ID of the current plant in the ring.
      * @return The {@link PowerPlantInfo} of the next plant.
      */
-    public PowerPlantInfo getNextPlantInRing(String currentPlantId) {
+    public PowerPlantInfo getNextPlantInRing(int currentPlantId) {
         return plantRegistry.getNextInRing(currentPlantId);
     }
 

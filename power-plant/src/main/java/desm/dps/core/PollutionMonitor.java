@@ -28,7 +28,7 @@ public class PollutionMonitor {
     public PollutionMonitor(PowerPlantInfo selfInfo, String mqttBrokerUrl, String pollutionTopic) {
         this.selfInfo = selfInfo;
         this.sensorManager = new SensorManager(selfInfo.plantId() + "-PollutionMonitor");
-        this.pollutionDataPublisher = new PollutionDataPublisher(mqttBrokerUrl, selfInfo.plantId(), pollutionTopic);
+        this.pollutionDataPublisher = new PollutionDataPublisher(mqttBrokerUrl, String.valueOf(selfInfo.plantId()), pollutionTopic);
     }
 
     /**

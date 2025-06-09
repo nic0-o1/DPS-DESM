@@ -16,7 +16,7 @@ import java.util.Queue;
 public class EnergyRequestProcessor {
     private static final Logger logger = LoggerFactory.getLogger(EnergyRequestProcessor.class);
 
-    private final String selfPlantId;
+    private final int selfPlantId;
     private final ElectionManager electionManager;
 
     // --- State variables protected by synchronization ---
@@ -27,7 +27,7 @@ public class EnergyRequestProcessor {
     private final Queue<EnergyRequest> pendingRequests = new LinkedList<>();
     private final Object pendingRequestsLock = new Object();
 
-    public EnergyRequestProcessor(String selfPlantId, ElectionManager electionManager) {
+    public EnergyRequestProcessor(int selfPlantId, ElectionManager electionManager) {
         this.selfPlantId = selfPlantId;
         this.electionManager = electionManager;
     }

@@ -8,7 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-// Removed import java.util.Optional;
 
 @Service
 public class PlantService {
@@ -36,8 +35,9 @@ public class PlantService {
             logger.warn("Attempted to register a null plantInfo object.");
             return false;
         }
-        if (plantInfo.plantId() == null || plantInfo.plantId().trim().isEmpty()) {
-            logger.warn("Attempted to register a plant with null or empty ID.");
+        // Assuming plant IDs should be positive integers.
+        if (plantInfo.plantId() <= 0) {
+            logger.warn("Attempted to register a plant with invalid ID: {}.", plantInfo.plantId());
             return false;
         }
         if (plantInfo.address() == null || plantInfo.address().trim().isEmpty()) {
@@ -64,9 +64,10 @@ public class PlantService {
      * @param plantId The ID of the plant to retrieve.
      * @return The PowerPlantInfo object if found, otherwise null.
      */
-    public PowerPlantInfo getPlantById(String plantId) {
-        if (plantId == null || plantId.trim().isEmpty()) {
-            logger.warn("Attempted to retrieve plant with null or empty ID.");
+    public PowerPlantInfo getPlantById(int plantId) {
+        // Assuming plant IDs should be positive integers.
+        if (plantId <= 0) {
+            logger.warn("Attempted to retrieve plant with an invalid ID: {}", plantId);
             return null;
         }
         logger.info("Retrieving plant by ID: {}", plantId);

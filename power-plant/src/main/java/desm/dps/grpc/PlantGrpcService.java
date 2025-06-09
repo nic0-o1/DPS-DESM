@@ -49,7 +49,7 @@ public class PlantGrpcService extends PlantCommunicationServiceGrpc.PlantCommuni
     @Override
     public void forwardElectionToken(ElectCoordinatorToken request, StreamObserver<Ack> responseObserver) {
         try {
-            String selfId = powerPlant.getSelfInfo().plantId();
+            int selfId = powerPlant.getSelfInfo().plantId();
             logger.info("gRPC service received ForwardElectionToken for ER: {} from initiator: {} (current best: {} at ${})",
                     request.getEnergyRequestId(),
                     request.getInitiatorId(),

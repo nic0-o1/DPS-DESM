@@ -48,8 +48,8 @@ public class PowerPlantApp {
 
         AppConfig config = AppConfig.getInstance();
 
-        int plantId = 2;
-        int plantPort = 56002;
+        int plantId = 1;
+        int plantPort = 56001;
 
         String adminServerBaseUrl = config.getAdminServerBaseUrl();
         String mqttBrokerUrl = config.getMqttBrokerUrl();
@@ -91,9 +91,9 @@ public class PowerPlantApp {
             commandScanner.close();
         } catch (Exception e) {
             if (isPortBindingError(e)) {
-                logger.error("STARTUP FAILED: PowerPlant {} could not bind to port {} - port already in use", plantId, plantPort);
+                logger.error("PLANT ERROR: PowerPlant {} could not bind to port {} - port already in use", plantId, plantPort);
             } else {
-                logger.error("STARTUP FAILED: PowerPlant {} encountered an unexpected error during startup {}", plantId, e.getMessage());
+                logger.error("STARTUP ERROR: PowerPlant {} encountered an unexpected error during startup {}", plantId, e.getMessage());
             }
 
             // Attempt graceful shutdown of any initialized resources

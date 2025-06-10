@@ -92,7 +92,7 @@ public class PowerPlant {
             throw new IllegalStateException("Failed to register with the Admin Server...");
         }
         // To enable pollution monitoring, uncomment the following line:
-//        pollutionMonitor.start();
+        pollutionMonitor.start();
         logger.info("PowerPlant {} is fully started and operational.", selfInfo.plantId());
     }
 

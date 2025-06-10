@@ -8,7 +8,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Manages the sensor readings and processes them in a sliding window to compute average CO2 values.
@@ -22,7 +25,7 @@ public class SensorManager extends Thread {
     private final Buffer rawMeasurementBuffer;
     private final Simulator pollutionSensor;
 
-    private final List<Measurement> currentWindow;
+    private final Deque<Measurement> currentWindow;
     private final List<Double> computedAverages;
 
     private final Object windowLock = new Object();
@@ -32,7 +35,7 @@ public class SensorManager extends Thread {
         super(name);
         this.rawMeasurementBuffer = new MeasurementBuffer();
         this.pollutionSensor = new PollutionSensor(this.rawMeasurementBuffer);
-        this.currentWindow = new ArrayList<>();
+        this.currentWindow = new LinkedList<>();
         this.computedAverages = new ArrayList<>();
     }
 
@@ -50,7 +53,9 @@ public class SensorManager extends Thread {
                     logger.debug("Added {} new measurements. Current window size: {}", newMeasurements.size(), currentWindow.size());
 
                     while (currentWindow.size() >= WINDOW_SIZE) {
-                        List<Measurement> window = new ArrayList<>(currentWindow.subList(0, WINDOW_SIZE));
+                        List<Measurement> window = currentWindow.stream()
+                                .limit(WINDOW_SIZE)
+                                .collect(Collectors.toList());
                         double average = computeAverage(window);
                         computedAverages.add(average);
 
@@ -58,7 +63,7 @@ public class SensorManager extends Thread {
                                 String.format("%.2f", average), WINDOW_SIZE, computedAverages.size());
 
                         for (int i = 0; i < OLDEST_TO_DISCARD && !currentWindow.isEmpty(); i++) {
-                            currentWindow.remove(0);
+                            currentWindow.removeFirst();
                         }
                         logger.debug("Discarded {} oldest measurements. Remaining window size: {}", OLDEST_TO_DISCARD, currentWindow.size());
                     }

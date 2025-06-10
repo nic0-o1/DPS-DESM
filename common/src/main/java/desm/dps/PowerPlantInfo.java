@@ -35,11 +35,7 @@ public record PowerPlantInfo(int plantId, String address,
     // --- toString, equals, and hashCode are preserved as they were correctly implemented ---
     @Override
     public String toString() {
-        return "PowerPlantInfo{" +
-                "plantId='" + plantId + '\'' +
-                ", address='" + address + '\'' +
-                ", port=" + port +
-                '}';
+        return "Plant ID: " + plantId + ", Address: " + address + ", Port: " + port + "\n";
     }
 
 }

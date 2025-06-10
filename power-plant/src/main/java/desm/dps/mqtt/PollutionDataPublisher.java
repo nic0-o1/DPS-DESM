@@ -10,12 +10,13 @@ import org.slf4j.LoggerFactory;
 
 public class PollutionDataPublisher {
     private static final Logger logger = LoggerFactory.getLogger(PollutionDataPublisher.class);
+    private static final int QOS_LEVEL = 2;
+
     private final String brokerUrl;
     private final String clientId;
     private final String topic;
     private IMqttClient mqttClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final int QOS = 1;
 
     public PollutionDataPublisher(String brokerUrl, String clientId, String topic) {
         this.brokerUrl = brokerUrl;
@@ -54,7 +55,7 @@ public class PollutionDataPublisher {
         try {
             String payload = objectMapper.writeValueAsString(data);
             MqttMessage message = new MqttMessage(payload.getBytes());
-            message.setQos(QOS);
+            message.setQos(QOS_LEVEL);
 
             mqttClient.publish(topic, message);
             logger.info("Published pollution data for plant {} to topic {}: {}", data.plantId(), topic, payload);

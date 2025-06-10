@@ -22,15 +22,15 @@ import java.util.concurrent.ScheduledExecutorService;
 public class ElectionManager {
 	private static final Logger logger = LoggerFactory.getLogger(ElectionManager.class);
 	private static final double INVALID_BID_PRICE = -1.0;
+	private static final int TEST_SLEEP_DURATION_MS = 22000;
 
 	private final PowerPlant powerPlant;
 	private final ElectionStateRepository stateRepository;
 	private final RingAlgorithmProcessor algorithmProcessor;
-	private final ScheduledExecutorService cleanupExecutor;
 
-	public ElectionManager(PowerPlant powerPlant, PlantGrpcClient grpcClient) {
+    public ElectionManager(PowerPlant powerPlant, PlantGrpcClient grpcClient) {
 		this.powerPlant = powerPlant;
-		this.cleanupExecutor = Executors.newScheduledThreadPool(1, r -> new Thread(r, "ElectionCleanup"));
+        ScheduledExecutorService cleanupExecutor = Executors.newScheduledThreadPool(1, r -> new Thread(r, "ElectionCleanup"));
 		ElectionCommunicator communicator = new ElectionCommunicator(powerPlant, grpcClient);
 		this.stateRepository = new ElectionStateRepository(cleanupExecutor);
 		this.algorithmProcessor = new RingAlgorithmProcessor(powerPlant, communicator);
@@ -40,6 +40,7 @@ public class ElectionManager {
 	 * Main entry point to process a new energy request.
 	 */
 	public void processNewEnergyRequest(EnergyRequest energyRequest) {
+//		performTestSleep();
 		int selfId = powerPlant.getSelfInfo().plantId();
 		double price = powerPlant.isBusy() ? INVALID_BID_PRICE : powerPlant.generatePrice();
 		ElectionState state = stateRepository.getOrCreate(energyRequest.requestID(), energyRequest, price);
@@ -99,6 +100,18 @@ public class ElectionManager {
 				powerPlant.fulfillEnergyRequest(state.getRequest(), announcement.getWinningPrice());
 			}
 			stateRepository.scheduleCleanup(requestId);
+		}
+	}
+
+	private void performTestSleep() {
+		int selfId = powerPlant.getSelfInfo().plantId();
+		try {
+			logger.warn(">>> [TEST-ONLY] PLANT {} PAUSING FOR {} SECONDS BEFORE ELECTION <<<", selfId, TEST_SLEEP_DURATION_MS / 1000);
+			Thread.sleep(TEST_SLEEP_DURATION_MS);
+			logger.warn(">>> [TEST-ONLY] PLANT {} RESUMING... <<<", selfId);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			logger.error("Test sleep was interrupted", e);
 		}
 	}
 

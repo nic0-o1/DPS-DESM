@@ -24,7 +24,8 @@ public class PlantGrpcService extends PlantCommunicationServiceGrpc.PlantCommuni
             PowerPlantInfo newPlantInfo = new PowerPlantInfo(
                     meta.getPlantId(),
                     meta.getAddress().getHost(),
-                    meta.getAddress().getPort()
+                    meta.getAddress().getPort(),
+                    meta.getRegistrationTime()
             );
             logger.info("Received presence announcement from: {}", newPlantInfo.plantId());
             powerPlant.addOtherPlant(newPlantInfo);

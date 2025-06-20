@@ -130,7 +130,7 @@ public class PlantRegistry {
     }
 
     private void sortAndInvalidateCache() {
-        otherPlantsList.sort(Comparator.comparing(PowerPlantInfo::plantId));
+        otherPlantsList.sort(Comparator.comparing(PowerPlantInfo::registrationTime));
         this.cachedRingArray = null; // Invalidate cache on any modification
     }
 

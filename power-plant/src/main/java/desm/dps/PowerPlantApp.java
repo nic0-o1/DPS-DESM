@@ -33,7 +33,7 @@ public class PowerPlantApp {
                 String energyRequestTopic = config.getEnergyRequestTopic();
                 String pollutionPublishTopic = config.getPollutionPublishTopic();
 
-                PowerPlantInfo selfInfo = new PowerPlantInfo(plantId, "localhost", plantPort);
+                PowerPlantInfo selfInfo = new PowerPlantInfo(plantId, "localhost", plantPort, System.currentTimeMillis());
                 powerPlant = new PowerPlant(selfInfo, adminServerBaseUrl, mqttBrokerUrl, energyRequestTopic, pollutionPublishTopic);
 
                 powerPlant.start();

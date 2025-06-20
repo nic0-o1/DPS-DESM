@@ -5,20 +5,15 @@ import java.util.Objects;
 /**
  * Represents the connection information for a power plant.
  * This class has been refactored to be an immutable data object.
- * 1.  All fields are 'private final' to ensure they cannot be changed after construction.
- * 2.  Setters have been removed.
- * 3.  Validation is performed in the constructor to ensure an object can never be in an invalid state ("fail-fast").
- * The method names `getPlantId()`, `getAddress()`, etc., are preserved for backward compatibility.
  */
 public record PowerPlantInfo(int plantId, String address,
-                             int port) { // 'final' prevents subclassing, which can break immutability
-    // The no-arg constructor has been removed as it would allow for an object with an invalid null state.
-    // All necessary data is now required upon creation.
+                             int port, long registrationTime) {
 
-    public PowerPlantInfo(int plantId, String address, int port) {
+    public PowerPlantInfo(int plantId, String address, int port,  long registrationTime) {
         // --- Validation: Fail-fast by checking invariants at construction time ---
         this.plantId = plantId;
         this.address = Objects.requireNonNull(address, "address cannot be null");
+        this.registrationTime = registrationTime;
 
 //        if (plantId.isBlank()) {
 //            throw new IllegalArgumentException("plantId cannot be blank");
@@ -35,7 +30,7 @@ public record PowerPlantInfo(int plantId, String address,
     // --- toString, equals, and hashCode are preserved as they were correctly implemented ---
     @Override
     public String toString() {
-        return "Plant ID: " + plantId + ", Address: " + address + ", Port: " + port + "\n";
+        return "Plant ID: " + plantId + ", Address: " + address + ", Port: " + port + ", Registration time: " +registrationTime+ "\n";
     }
 
 }

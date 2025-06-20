@@ -14,7 +14,8 @@ message PlantAddress {
 // Information about a power plant, used for internal gRPC and registration
 message PowerPlantMeta {
   int32 plant_id = 1;
-  PlantAddress address = 2; // gRPC listening address
+  PlantAddress address = 2;
+  int32 registration_time = 3;// gRPC listening address
 }
 
 // Request to announce presence to other existing plants

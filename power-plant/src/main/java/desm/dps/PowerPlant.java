@@ -8,6 +8,7 @@ import desm.dps.core.ServiceManager;
 import desm.dps.election.ElectionManager;
 import desm.dps.grpc.PlantGrpcClient;
 import desm.dps.rest.AdminServerClient;
+import desm.dps.rest.RegistrationConflictException;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +59,6 @@ public class PowerPlant {
         this.selfInfo = selfInfo;
         this.adminClient = new AdminServerClient(adminServerBaseUrl);
 
-        // Instantiate the hidden subsystem components
         this.plantRegistry = new PlantRegistry(selfInfo);
         PlantGrpcClient grpcClient = new PlantGrpcClient(this);
         ElectionManager electionManager = new ElectionManager(this, grpcClient);
@@ -80,18 +80,16 @@ public class PowerPlant {
      * @throws IOException   if there is an error starting network services like the gRPC server.
      * @throws MqttException if there is an error connecting to the MQTT broker.
      */
-    public void start() throws IOException, MqttException {
+    public void start() throws IOException, MqttException, RegistrationConflictException {
         if (isShutdown) {
             throw new IllegalStateException("Cannot start a shutdown PowerPlant.");
         }
         logger.info("Starting PowerPlant {}", selfInfo.plantId());
-        serviceManager.startServices();
         boolean registered = registerAndAnnounce();
         if (!registered) {
-            // Make the correct lifecycle decision: ABORT STARTUP
             throw new IllegalStateException("Failed to register with the Admin Server...");
         }
-        // To enable pollution monitoring, uncomment the following line:
+        serviceManager.startServices();
         pollutionMonitor.start();
         logger.info("PowerPlant {} is fully started and operational.", selfInfo.plantId());
     }
@@ -156,15 +154,17 @@ public class PowerPlant {
      * Registers this plant with the central admin server and announces its presence
      * to other plants discovered in the process.
      */
-    private boolean registerAndAnnounce() {
+    private boolean registerAndAnnounce() throws RegistrationConflictException {
         List<PowerPlantInfo> initialOtherPlants = adminClient.register(selfInfo);
-        if (initialOtherPlants != null && !initialOtherPlants.isEmpty()) {
+
+
+        if (!initialOtherPlants.isEmpty()) {
             plantRegistry.addInitialPlants(initialOtherPlants);
             logger.info("Registered with Admin Server. Discovered {} other plants.", plantRegistry.getOtherPlantsCount());
             serviceManager.announcePresenceTo(plantRegistry.getOtherPlantsSnapshot());
             return true;
         } else {
-            logger.warn("Registration with Admin Server yielded no other plants.");
+            logger.warn("Registration with Admin Server yielded no other plants or failed.");
             return false;
         }
     }

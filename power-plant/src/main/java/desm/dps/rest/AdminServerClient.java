@@ -35,12 +35,14 @@ public final class AdminServerClient {
 
     /**
      * Registers a power plant with the admin server.
-     * The logic, method signature, and return behavior are identical to the original version.
      *
      * @param plantInfo The information of the plant to register.
-     * @return A List of all registered plants on success; returns null on any failure.
+     * @return A List of all registered plants on success.
+     * @throws RegistrationConflictException if the plant ID already exists on the server (HTTP 409).
+     * @throws RestClientException if there is a communication error with the server.
      */
-    public List<PowerPlantInfo> register(PowerPlantInfo plantInfo) {
+    // CHANGE 1: The method signature now declares that it can throw our custom exception.
+    public List<PowerPlantInfo> register(PowerPlantInfo plantInfo) throws RegistrationConflictException {
         final String endpoint = baseUrl + PLANTS_ENDPOINT;
         final HttpEntity<PowerPlantInfo> request = createRequestEntity(plantInfo);
 
@@ -52,7 +54,7 @@ public final class AdminServerClient {
 
             log.info("POST to {} responded with status: {}", endpoint, response.getStatusCode());
 
-            if (response.getStatusCode() == HttpStatus.OK || response.getStatusCode() == HttpStatus.CREATED) {
+            if (response.getStatusCode().is2xxSuccessful()) { // More robust check for 2xx status codes
                 PowerPlantInfo[] plants = response.getBody();
                 if (plants != null) {
                     log.info("Plant '{}' registered successfully. Total registered plants: {}",
@@ -61,22 +63,28 @@ public final class AdminServerClient {
                 }
             }
 
-            log.warn("Registration was not successful for plant '{}'. Status: {}, Body was null: {}",
+            // If we reach here, something was wrong with the successful response
+            log.warn("Registration response was not as expected for plant '{}'. Status: {}, Body was null: {}",
                     plantInfo.plantId(), response.getStatusCode(), response.getBody() == null);
-            return null;
+            // Throw a generic exception for unexpected success-range responses
+            throw new RestClientException("Registration returned a success status but had an invalid body.");
 
         } catch (HttpClientErrorException e) {
+            // CHANGE 2: Specifically handle the CONFLICT status by throwing our custom exception.
             if (e.getStatusCode() == HttpStatus.CONFLICT) {
-                log.error("Registration failed: Plant ID '{}' already exists (HTTP 409 Conflict).", plantInfo.plantId());
+                String errorMessage = String.format("Plant ID '%s' already exists", plantInfo.plantId());
+                log.error("Registration failed: {} (HTTP 409 Conflict).", errorMessage);
+                throw new RegistrationConflictException(errorMessage);
             } else {
+                // For all other client-side HTTP errors (4xx), log and re-throw a generic exception.
                 log.error("Registration request failed with HTTP error: {} {}. Response: {}",
                         e.getStatusCode(), e.getStatusText(), e.getResponseBodyAsString(), e);
+                throw e; // Re-throw the original exception
             }
-            return null; // Return null on failure
-
         } catch (RestClientException e) {
+            // This catches server-side errors (5xx) and connection errors.
             log.error("Failed to register plant '{}' due to a communication error.", plantInfo.plantId(), e);
-            return null; // Return null on failure
+            throw e; // Re-throw the original exception
         }
     }
 

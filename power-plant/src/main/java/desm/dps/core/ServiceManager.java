@@ -21,7 +21,6 @@ import java.util.List;
  */
 public class ServiceManager {
     private static final Logger logger = LoggerFactory.getLogger(ServiceManager.class);
-    private static final int THREAD_JOIN_TIMEOUT_MS = 2_000;
 
     private final PowerPlant powerPlant;
     private final PowerPlantInfo selfInfo;

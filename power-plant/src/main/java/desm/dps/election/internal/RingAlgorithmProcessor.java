@@ -9,10 +9,6 @@ import desm.dps.grpc.ElectCoordinatorToken;
 /**
  * Encapsulates the core logic of the ring-based election algorithm.
  *
- * This class is designed to be stateless; its methods operate on a provided {@link ElectionState} object
- * to determine the next step in the election process for a specific energy request. It collaborates with
- * the {@link PowerPlant} to get node-specific information (like the next plant in the ring) and with the
- * {@link ElectionCommunicator} to handle all network-related tasks.
  */
 public final class RingAlgorithmProcessor {
 

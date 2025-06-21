@@ -11,9 +11,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 
 /**
- * Encapsulates the pollution monitoring and data publishing feature. It manages its own
- * thread for periodically publishing sensor data and can be started and stopped
- * independently of other plant services.
+ * Encapsulates the pollution monitoring and data publishing feature.
  */
 public class PollutionMonitor {
     private static final Logger logger = LoggerFactory.getLogger(PollutionMonitor.class);

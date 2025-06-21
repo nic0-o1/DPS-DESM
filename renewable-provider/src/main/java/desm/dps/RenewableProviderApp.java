@@ -5,15 +5,17 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Scanner;
 
+/**
+ * Main application class for the Renewable Energy Provider system.
+ */
 public class RenewableProviderApp {
-    // Logger for tracing application lifecycle events
+
     private static final Logger logger = LoggerFactory.getLogger(RenewableProviderApp.class);
 
     public static void main(String[] args) {
         logger.info("Starting Renewable Provider Application...");
         RenewableProvider provider = new RenewableProvider();
 
-        // Start the provider (establish connections, begin publishing, etc.)
         provider.start();
         logger.info("RenewableProvider started.");
 
@@ -24,13 +26,12 @@ public class RenewableProviderApp {
             logger.info("RenewableProvider stopped via shutdown hook.");
         }));
 
-        // Wait for user to press Enter before shutting down
+
         Scanner scanner = new Scanner(System.in);
         logger.info("Press ENTER to stop the application...");
         scanner.nextLine();
         scanner.close();
 
-        // If the provider is still running, stop it now
         if (provider.running) {
             logger.info("User requested shutdown. Stopping RenewableProvider...");
             provider.stop();

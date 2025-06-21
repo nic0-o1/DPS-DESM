@@ -12,7 +12,7 @@ public class RenewableProvider {
     private static final Logger logger = LoggerFactory.getLogger(RenewableProvider.class);
 
     /** Interval between energy request publications in milliseconds */
-    private static final long PUBLISH_INTERVAL_MS = 10 * 1000; // 10 seconds in milliseconds
+    private static final long PUBLISH_INTERVAL_MS = 10 * 1000;
 
     /** Generator for creating energy requests */
     private final RequestGenerator requestGenerator;
@@ -49,7 +49,6 @@ public class RenewableProvider {
         logger.info("Starting Renewable Provider - will publish requests every {} seconds",
                 PUBLISH_INTERVAL_MS / 1000);
 
-        // Create and start the background thread for publishing requests
         providerThread = new Thread(() -> {
             while (running) {
                 try {
@@ -60,26 +59,21 @@ public class RenewableProvider {
                     requestPublisher.publishRequest(request);
                     logger.info("Successfully published energy request");
 
-                    // Wait for the specified interval before next publication
                     logger.debug("Sleeping for {} ms before next request", PUBLISH_INTERVAL_MS);
                     Thread.sleep(PUBLISH_INTERVAL_MS);
 
-                    // Set running to false after one iteration (preserving original logic)
-                    running = false;
-                    logger.debug("Setting running flag to false after single iteration");
 
                 } catch (InterruptedException e) {
                     logger.info("Renewable Provider thread interrupted - stopping gracefully");
                     Thread.currentThread().interrupt();
-                    running = false; // Stop the loop on interruption
+                    running = false;
                 } catch (Exception e) {
                     logger.error("Error in Renewable Provider thread: {}", e.getMessage(), e);
-                    // Depending on requirements, you might want to continue or stop on other errors
                 }
             }
 
             logger.info("Provider thread stopping - disconnecting MQTT client");
-            requestPublisher.disconnect(); // Disconnect MQTT client when the thread stops
+            requestPublisher.disconnect();
             logger.debug("Renewable Provider thread stopped");
         }, "RenewableProvider-Thread");
 
@@ -98,15 +92,15 @@ public class RenewableProvider {
         }
 
         logger.info("Stopping Renewable Provider...");
-        running = false; // Signal the thread to stop
+        running = false;
 
-        // Interrupt the provider thread if it exists
+
         if (providerThread != null) {
             logger.debug("Interrupting provider thread");
             providerThread.interrupt();
         }
 
-        // Wait for the thread to complete
+
         try {
             if (providerThread != null) {
                 logger.debug("Waiting for provider thread to join");

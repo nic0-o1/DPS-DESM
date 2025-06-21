@@ -68,20 +68,25 @@ public class PowerPlantApp {
         System.out.println("Enter 'exit'to shut down the PowerPlant:");
 
         String command;
-        while (true) {
-            command = scanner.nextLine().trim().toLowerCase();
-            if (command.equals("exit")) {
-                break;
-            } else if (!command.isEmpty()) {
-                System.out.println("Unknown command. Enter 'exit' to shut down.");
+        try {
+            while (true) {
+                command = scanner.nextLine().trim().toLowerCase();
+                if (command.equals("exit")) {
+                    break;
+                } else if (!command.isEmpty()) {
+                    System.out.println("Unknown command. Enter 'exit' to shut down.");
+                }
             }
-        }
 
-        System.out.println("Shutting down PowerPlant " + plantId + "...");
-        if (powerPlant != null) {
-            powerPlant.shutdown();
+            System.out.println("Shutting down PowerPlant " + plantId + "...");
+            if (powerPlant != null) {
+                powerPlant.shutdown();
+            }
+            System.out.println("PowerPlant " + plantId + " shut down successfully.");
+        } catch (Exception _) {
         }
-        System.out.println("PowerPlant " + plantId + " shut down successfully.");
-        scanner.close();
+        finally {
+            scanner.close();
+        }
     }
 }

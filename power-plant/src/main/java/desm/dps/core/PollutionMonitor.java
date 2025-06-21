@@ -51,7 +51,7 @@ public class PollutionMonitor {
      * Stops all pollution monitoring services gracefully.
      */
     public void stop() {
-        if (!shouldPublish && publisherThread == null) return; // Already stopped
+        if (!shouldPublish && publisherThread == null) return;
         logger.info("Stopping pollution monitoring for plant {}.", selfInfo.plantId());
         shouldPublish = false;
 

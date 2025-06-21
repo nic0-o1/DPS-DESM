@@ -17,7 +17,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * A facade for the election system. It orchestrates the election process by delegating
- * tasks to specialized internal components, keeping this public-facing class clean and simple.
+ * tasks to specialized internal components.
  */
 public class ElectionManager {
 	private static final Logger logger = LoggerFactory.getLogger(ElectionManager.class);

@@ -19,7 +19,6 @@ public class PlantRegistry {
     private final List<PowerPlantInfo> otherPlantsList = new ArrayList<>();
     private final Object lock = new Object();
 
-    // A volatile, cached array of the complete ring for fast, lock-free lookups.
     private volatile PowerPlantInfo[] cachedRingArray = null;
 
     public PlantRegistry(PowerPlantInfo selfInfo) {
@@ -93,7 +92,7 @@ public class PlantRegistry {
             if (next != null) return next;
         }
         synchronized (lock) {
-            ring = this.cachedRingArray; // Double-check after acquiring lock
+            ring = this.cachedRingArray;
             if (ring == null) {
                 ring = buildCompleteRing();
                 this.cachedRingArray = ring;

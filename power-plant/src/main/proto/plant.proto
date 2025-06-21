@@ -15,7 +15,7 @@ message PlantAddress {
 message PowerPlantMeta {
   int32 plant_id = 1;
   PlantAddress address = 2;
-  int32 registration_time = 3;// gRPC listening address
+  int32 registration_time = 3;
 }
 
 // Request to announce presence to other existing plants
@@ -40,7 +40,7 @@ message ElectCoordinatorToken {
   int32 initiator_id = 1; // Plant ID of the plant that started this token
   string energy_request_id = 2; // The energy request this election is for
   Bid best_bid = 3; // Current best bid (lowest price, highest ID in case of tie)
-  double energy_amount_kwh = 4; // *** NEW: The amount of energy requested ***
+  double energy_amount_kwh = 4; // The amount of energy requested ***
 }
 
 // Announcement of the final winner for the energy request

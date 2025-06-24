@@ -1,6 +1,7 @@
 package desm.dps;
 
 import desm.dps.config.AppConfig;
+import desm.dps.grpc.PortInUseException;
 import desm.dps.rest.RegistrationConflictException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,6 +55,14 @@ public class PowerPlantApp {
                     powerPlant.shutdown();
                 }
 
+            }
+            catch (PortInUseException e) {
+                System.err.println("\n--- STARTUP FAILED ---");
+                System.err.println("REASON: " + e.getMessage());
+                System.err.println("Choose a different Port.\n");
+                if (powerPlant != null) {
+                    powerPlant.shutdown();
+                }
             } catch (Exception e) {
                 logger.error("FATAL STARTUP ERROR: PowerPlant {} could not be started.", plantId, e);
                 if (powerPlant != null) {

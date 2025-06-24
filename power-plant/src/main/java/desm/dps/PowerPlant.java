@@ -7,13 +7,13 @@ import desm.dps.core.PollutionMonitor;
 import desm.dps.core.ServiceManager;
 import desm.dps.election.ElectionManager;
 import desm.dps.grpc.PlantGrpcClient;
+import desm.dps.grpc.PortInUseException;
 import desm.dps.rest.AdminServerClient;
 import desm.dps.rest.RegistrationConflictException;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Random;
 
@@ -73,24 +73,38 @@ public class PowerPlant {
     }
 
     /**
-     * Starts the power plant and all its associated services.
-     * This method orchestrates the startup sequence by delegating to the service manager,
-     * registering with the admin server, and announcing its presence.
+     * Starts the power plant and its services in the correct order:
+     * 1. Bind the local gRPC port.
+     * 2. Register with the central admin server.
+     * 3. Start other services (MQTT) and announce presence to peers.
      *
-     * @throws IOException   if there is an error starting network services like the gRPC server.
-     * @throws MqttException if there is an error connecting to the MQTT broker.
+     * @throws PortInUseException if the gRPC port is already taken.
+     * @throws RegistrationConflictException if the plant ID is already registered.
+     * @throws MqttException if the MQTT connection fails.
      */
-    public void start() throws IOException, MqttException, RegistrationConflictException {
+    public void start() throws PortInUseException, RegistrationConflictException, MqttException {
         if (isShutdown) {
             throw new IllegalStateException("Cannot start a shutdown PowerPlant.");
         }
         logger.info("Starting PowerPlant {}", selfInfo.plantId());
-        boolean registered = registerAndAnnounce();
-        if (!registered) {
-            throw new IllegalStateException("Failed to register with the Admin Server...");
+
+        serviceManager.startGrpcServer();
+
+        List<PowerPlantInfo> initialOtherPlants = adminClient.register(selfInfo);
+
+        if (!initialOtherPlants.isEmpty()) {
+            plantRegistry.addInitialPlants(initialOtherPlants);
+            logger.info("Registered with Admin Server. Discovered {} other plants.", plantRegistry.getOtherPlantsCount());
+        } else {
+            logger.info("Registered with Admin Server. This is the first plant or no others were found.");
         }
-        serviceManager.startServices();
-        pollutionMonitor.start();
+
+        serviceManager.startMqttSubscriber();
+        pollutionMonitor.start(); // Uncomment if you want the pollution monitor to start here
+
+        // Announce presence to other peers
+        serviceManager.announcePresenceTo(plantRegistry.getOtherPlantsSnapshot());
+
         logger.info("PowerPlant {} is fully started and operational.", selfInfo.plantId());
     }
 
@@ -148,25 +162,6 @@ public class PowerPlant {
         double maxPrice = config.getMaxPrice();
         double price = minPrice + (maxPrice - minPrice) * random.nextDouble();
         return Math.round(price * 100.0) / 100.0;
-    }
-
-    /**
-     * Registers this plant with the central admin server and announces its presence
-     * to other plants discovered in the process.
-     */
-    private boolean registerAndAnnounce() throws RegistrationConflictException {
-        List<PowerPlantInfo> initialOtherPlants = adminClient.register(selfInfo);
-
-
-        if (!initialOtherPlants.isEmpty()) {
-            plantRegistry.addInitialPlants(initialOtherPlants);
-            logger.info("Registered with Admin Server. Discovered {} other plants.", plantRegistry.getOtherPlantsCount());
-            serviceManager.announcePresenceTo(plantRegistry.getOtherPlantsSnapshot());
-            return true;
-        } else {
-            logger.warn("Registration with Admin Server yielded no other plants or failed.");
-            return false;
-        }
     }
 
     // --- Getters and Delegates to Subsystems ---

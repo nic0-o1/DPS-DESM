@@ -5,6 +5,7 @@ import desm.dps.PowerPlantInfo;
 import desm.dps.election.ElectionManager;
 import desm.dps.grpc.PlantGrpcClient;
 import desm.dps.grpc.PlantGrpcService;
+import desm.dps.grpc.PortInUseException;
 import desm.dps.mqtt.EnergyRequestSubscriber;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -13,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.net.BindException;
 import java.util.List;
 
 /**
@@ -44,16 +46,6 @@ public class ServiceManager {
         this.energyRequestTopic = energyRequestTopic;
     }
 
-    /**
-     * Starts the core network services (gRPC, MQTT).
-     *
-     * @throws IOException   if the gRPC server fails to start.
-     * @throws MqttException if the MQTT subscriber fails to start.
-     */
-    public void startServices() throws IOException, MqttException {
-        startGrpcServer();
-        startMqttSubscriber();
-    }
 
     /**
      * Shuts down all managed services in a graceful manner.
@@ -77,16 +69,25 @@ public class ServiceManager {
         }
     }
 
-    private void startGrpcServer() throws IOException {
-        PlantGrpcService plantGrpcService = new PlantGrpcService(powerPlant, electionManager);
-        grpcServer = ServerBuilder.forPort(selfInfo.port())
-                .addService(plantGrpcService)
-                .build()
-                .start();
-        logger.info("gRPC Server started for plant {} on port {}", selfInfo.plantId(), selfInfo.port());
+    public void startGrpcServer() throws PortInUseException {
+        try {
+            PlantGrpcService plantGrpcService = new PlantGrpcService(powerPlant, electionManager);
+            grpcServer = ServerBuilder.forPort(selfInfo.port())
+                    .addService(plantGrpcService)
+                    .build()
+                    .start();
+            logger.info("gRPC Server started for plant {} on port {}", selfInfo.plantId(), selfInfo.port());
+        } catch (IOException e) {
+            // Check for the specific cause of the failure
+            if (e.getCause() instanceof BindException) {
+                throw new PortInUseException("Port " + selfInfo.port() + " is already in use.", e);
+            }
+            // For other unexpected IO errors, wrap in a runtime exception
+            throw new RuntimeException("Failed to start gRPC server due to an unexpected I/O error.", e);
+        }
     }
 
-    private void startMqttSubscriber() throws MqttException {
+    public  void startMqttSubscriber() throws MqttException {
         energyRequestSubscriber = new EnergyRequestSubscriber(
                 mqttBrokerUrl,
                 selfInfo.plantId() + "_subscriber",

@@ -72,7 +72,7 @@ public class ElectionManager {
 		}
 
 		if (state.trySetInitiated()) {
-			logger.info("Plant {} is initiating election for request {} with a bid of ${}.", selfId, requestId, price);
+			logger.info("Plant {} generated price ${} for request {}", selfId, price, energyRequest.requestID());
 			algorithmProcessor.initiate(state);
 		} else {
 			// This occurs if we receive the same request again after already initiating or participating.

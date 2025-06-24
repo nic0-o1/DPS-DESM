@@ -73,10 +73,7 @@ public class EnergyRequestSubscriber implements MqttCallback {
      */
     private MqttConnectOptions createConnectionOptions() {
         MqttConnectOptions connOpts = new MqttConnectOptions();
-        // A clean session means the broker discards all state for the client upon disconnection.
-        // For durable subscriptions, this should be set to false.
         connOpts.setCleanSession(true);
-        // Enable automatic reconnection attempts by the Paho client library.
         connOpts.setAutomaticReconnect(true);
         return connOpts;
     }
@@ -86,7 +83,6 @@ public class EnergyRequestSubscriber implements MqttCallback {
      * This method is safe to call even if the client is already disconnected.
      */
     public void stop() {
-        // Use a local reference to the volatile client for thread safety.
         MqttClient client = this.mqttClient;
         if (client != null && client.isConnected()) {
             try {
@@ -109,9 +105,6 @@ public class EnergyRequestSubscriber implements MqttCallback {
 
     @Override
     public void connectionLost(Throwable cause) {
-        // This callback is triggered when the connection is lost unexpectedly.
-        // Since setAutomaticReconnect(true) is used, the Paho library will handle
-        // reconnection attempts in the background. We log this event for monitoring.
         logger.error("MQTT connection lost for client '{}'. Cause: {}", clientId, cause.getMessage(), cause);
     }
 
@@ -133,14 +126,11 @@ public class EnergyRequestSubscriber implements MqttCallback {
         } catch (JsonProcessingException e) {
             logger.error("Failed to deserialize JSON payload on topic '{}'. Error: {}", topic, e.getMessage());
         } catch (Exception e) {
-            // Catching a broader exception to ensure the callback thread never dies.
             logger.error("An unexpected error occurred while processing MQTT message on topic '{}'.", topic, e);
         }
     }
 
     @Override
     public void deliveryComplete(IMqttDeliveryToken token) {
-        // This callback is for when this client *publishes* a message.
-        // Since this class is a subscriber-only, this method is not used.
     }
 }

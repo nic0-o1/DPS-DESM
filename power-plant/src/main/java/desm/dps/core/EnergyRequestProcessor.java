@@ -10,7 +10,7 @@ import java.util.Queue;
 
 /**
  * Manages the state and processing logic for energy requests. This class encapsulates
- * the "busy" state of the plant, a queue for pending requests, and the logic
+ * the busy state of the plant, a queue for pending requests, and the logic
  * for simulating energy production.
  */
 public class EnergyRequestProcessor {

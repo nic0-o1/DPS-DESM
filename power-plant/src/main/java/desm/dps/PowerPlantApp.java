@@ -74,7 +74,7 @@ public class PowerPlantApp {
         }
 
         System.out.println("PowerPlant is running.");
-        System.out.println("Enter 'exit'to shut down the PowerPlant:");
+        System.out.println("Enter 'exit' to shut down the PowerPlant:");
 
         String command;
         try {

@@ -47,7 +47,7 @@ public class ElectionManager {
 		// A dedicated thread for cleaning up old election states.
 		ScheduledExecutorService cleanupExecutor = Executors.newScheduledThreadPool(1,
 				r -> new Thread(r, "ElectionCleanup"));
-		this.communicator = new ElectionCommunicator(powerPlant, grpcClient);
+		this.communicator = new ElectionCommunicator(grpcClient);
 		this.stateRepository = new ElectionStateRepository(cleanupExecutor);
 		this.algorithmProcessor = new RingAlgorithmProcessor(powerPlant, this.communicator);
 	}

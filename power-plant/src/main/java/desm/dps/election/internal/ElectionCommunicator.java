@@ -1,6 +1,5 @@
 package desm.dps.election.internal;
 
-import desm.dps.PowerPlant;
 import desm.dps.PowerPlantInfo;
 import desm.dps.grpc.ElectCoordinatorToken;
 import desm.dps.grpc.EnergyWinnerAnnouncement;
@@ -10,11 +9,9 @@ import desm.dps.grpc.PlantGrpcClient;
  * Handles all network communication for the election process.
  */
 public class ElectionCommunicator {
-    private final PowerPlant powerPlant;
     private final PlantGrpcClient grpcClient;
 
-    public ElectionCommunicator(PowerPlant powerPlant, PlantGrpcClient grpcClient) {
-        this.powerPlant = powerPlant;
+    public ElectionCommunicator(PlantGrpcClient grpcClient) {
         this.grpcClient = grpcClient;
     }
 

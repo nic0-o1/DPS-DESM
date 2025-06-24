@@ -3,7 +3,7 @@
 
 **Distributed and Pervasive Systems Project – University of Milan (Master’s in Computer Science)**  
 
----
+
 ## ⚙️ Components
 
 ### 🌞 Renewable Energy Provider
@@ -28,7 +28,7 @@
     - Active thermal plants
     - CO₂ emission averages between time ranges
 
----
+
 
 ## 🔧 Technologies Used
 
@@ -38,7 +38,6 @@
 - **REST API** – for server-client communication
 - **Custom concurrency primitives** – threads, buffers, synchronization logic
 
----
 
 ## 🧪 Features
 
@@ -48,7 +47,7 @@
 - Distributed coordination and fairness in request fulfillment
 - (Optional) Plant departure handling (controlled & uncontrolled)
 
----
+
 
 ## ⚖️ License
 

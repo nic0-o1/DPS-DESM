@@ -2,7 +2,6 @@ package desm.dps.election.internal;
 
 import desm.dps.PowerPlant;
 import desm.dps.PowerPlantInfo;
-import desm.dps.grpc.Bid;
 import desm.dps.grpc.ElectCoordinatorToken;
 import desm.dps.grpc.EnergyWinnerAnnouncement;
 import desm.dps.grpc.PlantGrpcClient;
@@ -27,19 +26,17 @@ public class ElectionCommunicator {
     }
 
     /**
-     * Broadcasts the winner of an election to all other known plants.
+     * Forwards the winner announcement to the next plant in the ring to continue circulation.
+     * This replaces the previous broadcast implementation.
+     *
+     * @param nextPlant    The next plant in the ring.
+     * @param announcement The winner announcement message to forward.
      */
-    public void broadcastWinner(String requestId, Bid winnerBid) {
-        EnergyWinnerAnnouncement announcement = EnergyWinnerAnnouncement.newBuilder()
-                .setWinningPlantId(winnerBid.getPlantId())
-                .setWinningPrice(winnerBid.getPrice())
-                .setEnergyRequestId(requestId)
-                .build();
-
-        for (PowerPlantInfo plant : powerPlant.getOtherPlants()) {
-            if (plant.plantId() != powerPlant.getSelfInfo().plantId()) {
-                grpcClient.announceEnergyWinner(plant, announcement);
-            }
+    public void forwardWinnerAnnouncement(PowerPlantInfo nextPlant, EnergyWinnerAnnouncement announcement) {
+        // We only send if there is a next plant. The gRPC client will handle communication
+        // errors if the plant is down, and the PowerPlant logic will eventually remove it.
+        if (nextPlant != null) {
+            grpcClient.announceEnergyWinner(nextPlant, announcement);
         }
     }
 }

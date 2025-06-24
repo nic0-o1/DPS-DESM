@@ -5,6 +5,7 @@ import desm.dps.PowerPlantInfo;
 import desm.dps.election.model.ElectionState;
 import desm.dps.grpc.Bid;
 import desm.dps.grpc.ElectCoordinatorToken;
+import desm.dps.grpc.EnergyWinnerAnnouncement;
 
 /**
  * Encapsulates the core logic of the ring-based election algorithm.
@@ -91,33 +92,37 @@ public final class RingAlgorithmProcessor {
     /**
      * Completes the election process.
      * This method is called when the election token has returned to the initiator.
-     * It determines the final winner, and if the winner hasn't already been announced for this election,
-     * it broadcasts the result to all other plants. If this plant is the winner, it also
-     * fulfills the energy request.
+     * It determines the final winner and initiates a new ring-based message to announce the result.
+     * If this plant is the winner, it also fulfills the energy request.
      *
      * @param state The state object for the election being completed.
      * @param token The final election token after circulating the entire ring.
-     * @return {@code true} if this call successfully announced the winner; {@code false} if the
-     *         winner was already announced (e.g., due to a concurrent completion message).
+     * @return {@code true} if this call successfully started the announcement; {@code false} if the
+     *         winner was already announced.
      */
     public boolean complete(ElectionState state, ElectCoordinatorToken token) {
-        // Final update to ensure the state has the definitive winning bid from the token.
         state.updateBestBid(token.getBestBid());
         Bid winnerBid = state.getBestBid();
+        int selfId = powerPlant.getSelfInfo().plantId();
 
-        // Atomically check and set the "winner announced" flag. This prevents duplicate announcements
         if (state.trySetWinnerAnnounced()) {
-            // Check if this plant is the winner.
-            if (winnerBid.getPlantId() == powerPlant.getSelfInfo().plantId()) {
-                // If so, trigger the business logic to fulfill the request.
+            if (winnerBid.getPlantId() == selfId) {
                 powerPlant.fulfillEnergyRequest(state.getRequest(), winnerBid.getPrice());
             }
-            // Broadcast the winner's information to all other plants so they know the election is over.
-            communicator.broadcastWinner(state.getRequest().requestID(), winnerBid);
+
+
+            EnergyWinnerAnnouncement announcement = EnergyWinnerAnnouncement.newBuilder()
+                    .setWinningPlantId(winnerBid.getPlantId())
+                    .setWinningPrice(winnerBid.getPrice())
+                    .setEnergyRequestId(state.getRequest().requestID())
+                    .setInitiatorId(selfId) // Set initiator for circulation control
+                    .build();
+
+            PowerPlantInfo nextPlant = powerPlant.getNextPlantInRing(selfId);
+            communicator.forwardWinnerAnnouncement(nextPlant, announcement);
+
             return true;
         }
-
-        // The winner was already announced by another thread or a concurrent message. Do nothing.
         return false;
     }
 

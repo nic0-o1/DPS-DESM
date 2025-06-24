@@ -48,6 +48,7 @@ message EnergyWinnerAnnouncement {
   int32 winning_plant_id = 1;
   double winning_price = 2;
   string energy_request_id = 3;
+  int32 initiator_id =4;
 }
 
 // Service definition for inter-plant communication

@@ -84,7 +84,7 @@ public class PowerPlant {
         }
 
         serviceManager.startMqttSubscriber();
-//        serviceManager.startPollutionMonitor();
+        serviceManager.startPollutionMonitor();
         serviceManager.announcePresenceTo(plantRegistry.getOtherPlantsSnapshot());
 
         logger.info("PowerPlant {} is fully started and operational.", selfInfo.plantId());

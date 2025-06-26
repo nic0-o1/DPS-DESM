@@ -43,8 +43,6 @@ public final class RingAlgorithmProcessor {
         // Atomically update the best bid to our own.
         state.updateBestBid(myBid);
 
-        // Re-check: if our bid is no longer the best, another thread has updated it.
-        // This is an intentional design to handle concurrent bid updates safely.
         if (state.getBestBid().getPlantId() != selfId) {
             logger.warn("Aborting election initiation for ER {}. A better bid from Plant {} was received concurrently.",
                     state.getRequest().requestID(), state.getBestBid().getPlantId());

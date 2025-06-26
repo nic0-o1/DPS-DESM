@@ -107,9 +107,8 @@ public class PlantGrpcClient {
 
 			stub.withDeadlineAfter(GRPC_TIMEOUT_SECONDS, TimeUnit.SECONDS).forwardElectionToken(token);
 		} catch (StatusRuntimeException e) {
-			logger.error("RPC to forwardElectionToken to Plant {} failed: {}. Removing plant from ring.",
+			logger.error("RPC to forwardElectionToken to Plant {} failed: {}.",
 					targetPlant.plantId(), e.getStatus(), e);
-			powerPlant.removeOtherPlant(targetPlant.plantId());
 		}
 	}
 

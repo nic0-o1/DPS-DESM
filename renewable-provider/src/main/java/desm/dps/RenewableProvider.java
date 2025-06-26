@@ -59,7 +59,6 @@ public class RenewableProvider {
                     requestPublisher.publishRequest(request);
                     logger.info("Successfully published energy request");
 
-                    logger.debug("Sleeping for {} ms before next request", PUBLISH_INTERVAL_MS);
                     Thread.sleep(PUBLISH_INTERVAL_MS);
 
 

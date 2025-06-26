@@ -4,29 +4,37 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Represents a set of pollution data averages from a specific power plant.
+ * An immutable record representing a batch of pollution data from a specific power plant.
+ * It contains the plant's ID, a timestamp, and a list of computed CO2 averages.
+ *
+ * @param plantId The ID of the power plant that produced this data.
+ * @param listComputationTimestamp The timestamp when the list of averages was finalized.
+ * @param averages A list of computed average pollution values. A defensive copy is made to ensure immutability.
  */
 public record PollutionData(int plantId, long listComputationTimestamp, List<Double> averages) {
+
+    /**
+     * Constructs a new PollutionData object.
+     * To ensure true immutability, this constructor creates a defensive, unmodifiable copy of the provided list of averages.
+     *
+     * @throws NullPointerException if the {@code averages} list is null.
+     */
     public PollutionData(int plantId, long listComputationTimestamp, List<Double> averages) {
-        // --- Validation ---
         this.plantId = plantId;
         this.listComputationTimestamp = listComputationTimestamp;
-        Objects.requireNonNull(averages, "averages list cannot be null");
-
-        // --- Defensive Copying for Immutability ---
-        // List.copyOf() creates an unmodifiable copy. This is critical for true immutability,
-        // as it protects the internal list from outside modification.
-        this.averages = List.copyOf(averages);
+        // Use List.copyOf to create a defensive, unmodifiable copy of the list,
+        // protecting the internal state of this record from external modification.
+        this.averages = List.copyOf(Objects.requireNonNull(averages, "Averages list cannot be null."));
     }
 
     /**
-     * Returns the list of averages.
+     * Returns the list of computed pollution averages.
      *
-     * @return An unmodifiable list of averages. Any attempt to modify it (e.g., .add())
-     * will throw an UnsupportedOperationException, protecting the object's integrity.
+     * @return An unmodifiable list of averages. Any attempt to modify the returned list
+     *         (e.g., via {@code .add()}) will result in an {@link UnsupportedOperationException}.
      */
     @Override
     public List<Double> averages() {
-        return averages;
+        return this.averages;
     }
 }

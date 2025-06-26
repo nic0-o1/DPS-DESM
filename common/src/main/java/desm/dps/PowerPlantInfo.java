@@ -34,6 +34,6 @@ public record PowerPlantInfo(int plantId, String address, int port, long registr
 
     @Override
     public String toString() {
-        return "PowerPlantInfo[id=" + plantId + ", address=" + address + ":" + port + "]";
+        return "Plant ID: " + plantId + ", Address: " + address + ", Port: " + port + ", Registration time: " +registrationTime+ "\n";
     }
 }

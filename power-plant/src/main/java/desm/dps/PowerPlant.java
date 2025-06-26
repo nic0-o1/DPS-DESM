@@ -18,69 +18,54 @@ import java.util.List;
 import java.util.Random;
 
 /**
-/**
- * Acts as a Facade for the power plant system. It provides a simplified, high-level interface
- * for starting, stopping, and interacting with the plant, while hiding the complex
- * network of internal components that manage state, services, and processing logic.
+ * The main facade class for a power plant, coordinating all its subsystems and managing its lifecycle.
+ * It handles startup, shutdown, and delegation of incoming energy requests.
  */
 public class PowerPlant {
     private static final Logger logger = LoggerFactory.getLogger(PowerPlant.class);
 
-    // --- Core Immutable State & Dependencies ---
     private final PowerPlantInfo selfInfo;
     private final AdminServerClient adminClient;
+    private final AppConfig config;
     private final Random random = new Random();
 
-    // --- Subsystem Components (Hidden behind the Facade) ---
     private final PlantRegistry plantRegistry;
     private final EnergyRequestProcessor energyRequestProcessor;
     private final ServiceManager serviceManager;
+    private final ElectionManager electionManager;
     private final PollutionMonitor pollutionMonitor;
 
     private volatile boolean isShutdown = false;
 
-    private final AppConfig config;
-
-    /**
-     * Constructs a new PowerPlant instance.
-     * Initializes all the internal subsystems required for the plant's operation.
-     *
-     * @param selfInfo              Information about this power plant.
-     * @param adminServerBaseUrl    The base URL of the central administration server.
-     * @param mqttBrokerUrl         The URL of the MQTT broker for messaging.
-     * @param energyRequestTopic    The MQTT topic for listening to energy requests.
-     * @param pollutionPublishTopic The MQTT topic for publishing pollution data
-     */
     public PowerPlant(PowerPlantInfo selfInfo, String adminServerBaseUrl, String mqttBrokerUrl, String energyRequestTopic,
                       String pollutionPublishTopic) {
         if (selfInfo == null || adminServerBaseUrl == null || mqttBrokerUrl == null || energyRequestTopic == null || pollutionPublishTopic == null) {
-            throw new IllegalArgumentException("All constructor parameters must be non-null");
+            throw new IllegalArgumentException("All constructor parameters must be non-null.");
         }
         this.selfInfo = selfInfo;
         this.adminClient = new AdminServerClient(adminServerBaseUrl);
+        this.config = AppConfig.getInstance();
 
         this.plantRegistry = new PlantRegistry(selfInfo);
         PlantGrpcClient grpcClient = new PlantGrpcClient(this);
-        ElectionManager electionManager = new ElectionManager(this, grpcClient);
-        this.energyRequestProcessor = new EnergyRequestProcessor(selfInfo.plantId(), electionManager);
+        this.electionManager = new ElectionManager(this, grpcClient);
+        this.energyRequestProcessor = new EnergyRequestProcessor(selfInfo.plantId(), this.electionManager);
         this.pollutionMonitor = new PollutionMonitor(selfInfo, mqttBrokerUrl, pollutionPublishTopic);
+
         this.serviceManager = new ServiceManager(this, selfInfo, grpcClient, electionManager, pollutionMonitor,
                 mqttBrokerUrl, energyRequestTopic);
-
-        this.config = AppConfig.getInstance();
 
         logger.info("Initialized PowerPlant Facade for ID: {}", selfInfo.plantId());
     }
 
     /**
-     * Starts the power plant and its services in the correct order:
-     * 1. Bind the local gRPC port.
-     * 2. Register with the central admin server.
-     * 3. Start other services (MQTT) and announce presence to peers.
+     * Starts the power plant and all its services. This includes starting the gRPC server,
+     * registering with the admin server, discovering other plants, starting MQTT clients,
+     * and announcing its presence to the network.
      *
-     * @throws PortInUseException if the gRPC port is already taken.
-     * @throws RegistrationConflictException if the plant ID is already registered.
-     * @throws MqttException if the MQTT connection fails.
+     * @throws PortInUseException if the gRPC port is already in use.
+     * @throws RegistrationConflictException if this plant's ID is already registered.
+     * @throws MqttException if any MQTT client fails to connect.
      */
     public void start() throws PortInUseException, RegistrationConflictException, MqttException {
         if (isShutdown) {
@@ -89,33 +74,27 @@ public class PowerPlant {
         logger.info("Starting PowerPlant {}", selfInfo.plantId());
 
         serviceManager.startGrpcServer();
-
         List<PowerPlantInfo> initialOtherPlants = adminClient.register(selfInfo);
 
         if (!initialOtherPlants.isEmpty()) {
             plantRegistry.addInitialPlants(initialOtherPlants);
             logger.info("Registered with Admin Server. Discovered {} other plants.", plantRegistry.getOtherPlantsCount());
         } else {
-            logger.info("Registered with Admin Server. This is the first plant or no others were found.");
+            logger.info("Registered with Admin Server. This is the first plant in the network.");
         }
 
         serviceManager.startMqttSubscriber();
-        pollutionMonitor.start(); // Uncomment if you want the pollution monitor to start here
-
-        // Announce presence to other peers
+//        serviceManager.startPollutionMonitor();
         serviceManager.announcePresenceTo(plantRegistry.getOtherPlantsSnapshot());
 
         logger.info("PowerPlant {} is fully started and operational.", selfInfo.plantId());
     }
 
     /**
-     * Shuts down the power plant and all its services gracefully.
-     * Delegates the entire shutdown process to the service manager.
+     * Initiates a graceful shutdown of the power plant and all its associated services.
      */
     public void shutdown() {
-        if (isShutdown) {
-            return;
-        }
+        if (isShutdown) return;
         isShutdown = true;
         logger.info("Shutting down PowerPlant {}", selfInfo.plantId());
         serviceManager.shutdownServices();
@@ -123,25 +102,31 @@ public class PowerPlant {
     }
 
     /**
-     * Handles an incoming energy request by delegating it to the internal processor.
+     * Handles an incoming energy request by either starting an election immediately
+     * or queueing the request if the plant is currently busy with another one.
      *
-     * @param energyRequest The energy request received from the network.
+     * @param energyRequest The request to be processed.
      */
     public void handleIncomingEnergyRequest(EnergyRequest energyRequest) {
         if (energyRequest == null) {
             logger.warn("Received a null energy request. Ignoring.");
             return;
         }
-        logger.info("Facade received Energy Request {} for {} kWh", energyRequest.requestID(), energyRequest.amountKWh());
-        energyRequestProcessor.processIncomingRequest(energyRequest);
+        logger.info("Facade received Energy Request {} for {} kWh.", energyRequest.requestID(), energyRequest.amountKWh());
+
+        if (isBusy()) {
+            energyRequestProcessor.queueRequest(energyRequest);
+        } else {
+            energyRequestProcessor.startElectionForNewRequest(energyRequest);
+        }
     }
 
     /**
-     * Instructs the plant to fulfill an energy request after winning a bid.
-     * This is delegated to the internal processor.
+     * Fulfills an energy request. This method is called when the plant has won an election
+     * and is now responsible for the request.
      *
      * @param request The request to fulfill.
-     * @param price   The winning price for the bid.
+     * @param price The winning price for this request.
      */
     public void fulfillEnergyRequest(EnergyRequest request, double price) {
         if (request == null) {
@@ -152,10 +137,9 @@ public class PowerPlant {
     }
 
     /**
-     * Generates a random price for an energy bid. The price is constrained
-     * and rounded to two decimal places.
+     * Generates a pseudo-random price for an energy bid based on configured min/max values.
      *
-     * @return A randomly generated price.
+     * @return A price rounded to two decimal places.
      */
     public double generatePrice() {
         double minPrice = config.getMinPrice();
@@ -164,73 +148,33 @@ public class PowerPlant {
         return Math.round(price * 100.0) / 100.0;
     }
 
-    // --- Getters and Delegates to Subsystems ---
+    // --- DELEGATE METHODS TO SUBSYSTEMS ---
 
-    /**
-     * Adds a newly discovered plant to the internal registry.
-     * @param newPlant The information of the plant to add.
-     */
     public void addOtherPlant(PowerPlantInfo newPlant) {
         plantRegistry.addPlant(newPlant);
     }
 
-    /**
-     * Removes a plant from the internal registry, typically after it goes offline.
-     * @param plantId The ID of the plant to remove.
-     */
     public void removeOtherPlant(int plantId) {
         plantRegistry.removePlant(plantId);
     }
 
-    /**
-     * Finds the next plant in the logical communication ring.
-     * @param currentPlantId The ID of the current plant in the ring.
-     * @return The {@link PowerPlantInfo} of the next plant.
-     */
     public PowerPlantInfo getNextPlantInRing(int currentPlantId) {
         return plantRegistry.getNextInRing(currentPlantId);
     }
 
-    /**
-     * Retrieves a snapshot of all other known plants.
-     * @return A list of {@link PowerPlantInfo} for other plants.
-     */
     public List<PowerPlantInfo> getOtherPlants() {
         return plantRegistry.getOtherPlantsSnapshot();
     }
 
-    /**
-     * Gets this plant's own information.
-     * @return The {@link PowerPlantInfo} for this instance.
-     */
     public PowerPlantInfo getSelfInfo() {
         return selfInfo;
     }
 
-    /**
-     * Checks if the plant is currently busy fulfilling a request.
-     * @return true if the plant is busy, false otherwise.
-     */
     public boolean isBusy() {
         return energyRequestProcessor.isBusy();
     }
 
-    /**
-     * Gets the ID of the request the plant is currently processing.
-     * @return The request ID, or null if the plant is not busy.
-     */
-    public String getCurrentRequestId() {
-        return energyRequestProcessor.getCurrentRequestId();
-    }
-
-    /**
-     * Removes a specific request from the energy request queue.
-     * This is typically called when another plant has won the bid for the request.
-     *
-     * @param requestId The ID of the request to remove.
-     */
     public void removeRequestFromQueue(String requestId) {
         energyRequestProcessor.removeRequestById(requestId);
     }
-
 }

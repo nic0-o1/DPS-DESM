@@ -14,21 +14,25 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Manages the sensor readings and processes them in a sliding window to compute average CO2 values.
+ * Manages sensor readings by processing them in a sliding window to compute periodic averages.
+ * This class runs as a dedicated thread, consuming measurements from a buffer and producing
+ * average values.
  */
 public class SensorManager extends Thread {
     private static final Logger logger = LoggerFactory.getLogger(SensorManager.class);
 
-    private static final int WINDOW_SIZE = 8;       // Full window size
-    private static final int OLDEST_TO_DISCARD = 4; // Overlap size (50%)
+    private static final int WINDOW_SIZE = 8;
+    private static final int DISCARD_COUNT = 4; // Number of oldest items to discard to create a 50% overlap.
 
     private final Buffer rawMeasurementBuffer;
     private final Simulator pollutionSensor;
+    private final Object processingLock = new Object();
 
+    // --- State fields guarded by processingLock ---
     private final Deque<Measurement> currentWindow;
     private final List<Double> computedAverages;
+    // --- End of guarded state fields ---
 
-    private final Object windowLock = new Object();
     private volatile boolean stopCondition = false;
 
     public SensorManager(String name) {
@@ -39,82 +43,107 @@ public class SensorManager extends Thread {
         this.computedAverages = new ArrayList<>();
     }
 
+    /**
+     * The main execution loop of the sensor manager. It continuously reads new measurements,
+     * updates the sliding window, and computes averages when the window is full.
+     */
     @Override
     public void run() {
-        logger.info("SensorManager starting...");
+        logger.info("SensorManager thread starting...");
         pollutionSensor.start();
 
         while (!stopCondition) {
             List<Measurement> newMeasurements = rawMeasurementBuffer.readAllAndClean();
 
             if (!newMeasurements.isEmpty()) {
-                synchronized (windowLock) {
+                synchronized (processingLock) {
                     currentWindow.addAll(newMeasurements);
-                    logger.debug("Added {} new measurements. Current window size: {}", newMeasurements.size(), currentWindow.size());
+                    logger.debug("Added {} new measurements. Current window size: {}.", newMeasurements.size(), currentWindow.size());
 
+                    // Process all full windows that can be formed from the current data.
                     while (currentWindow.size() >= WINDOW_SIZE) {
-                        List<Measurement> window = currentWindow.stream()
-                                .limit(WINDOW_SIZE)
-                                .collect(Collectors.toList());
-                        double average = computeAverage(window);
-                        computedAverages.add(average);
-
-                        logger.info("Computed average {} from window of size {}. Total averages stored: {}",
-                                String.format("%.2f", average), WINDOW_SIZE, computedAverages.size());
-
-                        for (int i = 0; i < OLDEST_TO_DISCARD && !currentWindow.isEmpty(); i++) {
-                            currentWindow.removeFirst();
-                        }
-                        logger.debug("Discarded {} oldest measurements. Remaining window size: {}", OLDEST_TO_DISCARD, currentWindow.size());
+                        processWindow();
                     }
                 }
             }
+            // A short sleep can be added here if CPU usage is a concern, e.g., Thread.sleep(10)
         }
 
-        pollutionSensor.stopMeGently();
-        try {
-            pollutionSensor.join(1000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            logger.warn("Interrupted while joining pollution sensor thread.");
-        }
+        shutdownSensor();
+        logger.info("SensorManager thread stopped.");
+    }
 
-        logger.info("SensorManager stopped.");
+    /**
+     * Processes one full window of measurements: computes the average and slides the window forward.
+     * This method must be called within a block synchronized on {@code processingLock}.
+     */
+    private void processWindow() {
+        List<Measurement> windowSnapshot = currentWindow.stream()
+                .limit(WINDOW_SIZE)
+                .collect(Collectors.toList());
+
+        double average = computeAverage(windowSnapshot);
+        computedAverages.add(average);
+
+        logger.info("Computed average CO2: {}. Total averages stored: {}.",
+                String.format("%.2f", average), computedAverages.size());
+
+        // Slide the window by removing the oldest measurements.
+        for (int i = 0; i < DISCARD_COUNT && !currentWindow.isEmpty(); i++) {
+            currentWindow.removeFirst();
+        }
+        logger.debug("Discarded {} measurements. Remaining in window: {}.", DISCARD_COUNT, currentWindow.size());
     }
 
     /**
      * Computes the average value from a list of measurements.
      */
-    private double computeAverage(List<Measurement> window) {
-        double sum = 0;
-        for (Measurement m : window) {
-            sum += m.getValue();
+    private double computeAverage(List<Measurement> measurements) {
+        if (measurements == null || measurements.isEmpty()) {
+            return 0.0;
         }
-        return sum / window.size();
+        return measurements.stream()
+                .mapToDouble(Measurement::getValue)
+                .average()
+                .orElse(0.0);
     }
 
     /**
-     * Returns all computed averages and clears the internal list.
-     * Thread-safe method.
+     * Retrieves all computed averages and clears the internal storage. This is a thread-safe operation.
+     *
+     * @return A snapshot of all computed averages. Returns an empty list if none are available.
      */
     public List<Double> getAndClearAverages() {
-        synchronized (windowLock) {
+        synchronized (processingLock) {
             if (computedAverages.isEmpty()) {
                 return new ArrayList<>();
             }
             List<Double> averagesToReturn = new ArrayList<>(computedAverages);
             computedAverages.clear();
-            logger.debug("Retrieved and cleared {} averages.", averagesToReturn.size());
+            logger.debug("Retrieved and cleared {} computed averages.", averagesToReturn.size());
             return averagesToReturn;
         }
     }
 
     /**
-     * Requests the SensorManager to stop and interrupts its loop.
+     * Signals the SensorManager to stop its execution loop and clean up resources.
      */
     public void stopManager() {
-        logger.info("Stopping SensorManager...");
+        logger.info("Stopping SensorManager thread...");
         this.stopCondition = true;
-        this.interrupt();
+        this.interrupt(); // Interrupt in case the thread is sleeping.
+    }
+
+    /**
+     * Handles the graceful shutdown of the underlying pollution sensor.
+     */
+    private void shutdownSensor() {
+        pollutionSensor.stopMeGently();
+        try {
+            pollutionSensor.join(1000); // Wait up to 1 second for the sensor thread to die.
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.warn("Interrupted while waiting for pollution sensor thread to join.");
+        }
     }
 }

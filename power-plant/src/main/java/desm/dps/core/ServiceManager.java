@@ -18,8 +18,9 @@ import java.net.BindException;
 import java.util.List;
 
 /**
- * Manages the lifecycle of all network services and background threads for the PowerPlant.
- * This class centralizes the logic for starting and stopping components in the correct order.
+ * Manages the lifecycle of all network services and background components for the PowerPlant.
+ * This class centralizes the logic for starting and stopping the gRPC server, MQTT clients,
+ * and the pollution monitor in the correct order.
  */
 public class ServiceManager {
     private static final Logger logger = LoggerFactory.getLogger(ServiceManager.class);
@@ -32,8 +33,8 @@ public class ServiceManager {
     private final String mqttBrokerUrl;
     private final String energyRequestTopic;
 
-    private volatile Server grpcServer;
-    private volatile EnergyRequestSubscriber energyRequestSubscriber;
+    private Server grpcServer;
+    private EnergyRequestSubscriber energyRequestSubscriber;
 
     public ServiceManager(PowerPlant powerPlant, PowerPlantInfo selfInfo, PlantGrpcClient grpcClient, ElectionManager electionManager,
                           PollutionMonitor pollutionMonitor, String mqttBrokerUrl, String energyRequestTopic) {
@@ -46,15 +47,54 @@ public class ServiceManager {
         this.energyRequestTopic = energyRequestTopic;
     }
 
+    /**
+     * Starts the gRPC server to listen for incoming requests from other plants.
+     *
+     * @throws PortInUseException if the configured port is already occupied.
+     */
+    public void startGrpcServer() throws PortInUseException {
+        try {
+            PlantGrpcService plantGrpcService = new PlantGrpcService(powerPlant, electionManager);
+            grpcServer = ServerBuilder.forPort(selfInfo.port())
+                    .addService(plantGrpcService)
+                    .build()
+                    .start();
+            logger.info("gRPC Server started for Plant {} on port {}", selfInfo.plantId(), selfInfo.port());
+        } catch (IOException e) {
+            if (e.getCause() instanceof BindException) {
+                throw new PortInUseException("Port " + selfInfo.port() + " is already in use.", e);
+            }
+            throw new RuntimeException("Failed to start gRPC server due to an unexpected I/O error.", e);
+        }
+    }
 
     /**
-     * Shuts down all managed services in a graceful manner.
+     * Starts the MQTT subscriber to listen for broadcasted energy requests.
+     *
+     * @throws MqttException if the client fails to connect or subscribe.
      */
-    public void shutdownServices() {
-        stopMqttSubscriber();
-        shutdownGrpcServer();
-        shutdownGrpcClient();
-        pollutionMonitor.stop();
+    public void startMqttSubscriber() throws MqttException {
+        energyRequestSubscriber = new EnergyRequestSubscriber(
+                mqttBrokerUrl,
+                selfInfo.plantId() + "_subscriber",
+                energyRequestTopic,
+                powerPlant
+        );
+        energyRequestSubscriber.start();
+        logger.info("MQTT Subscriber started for Plant {} on topic {}", selfInfo.plantId(), energyRequestTopic);
+    }
+
+    /**
+     * Starts the pollution monitor, which includes its internal sensor simulation
+     * and MQTT publisher for pollution data.
+     *
+     * @throws MqttException if the internal pollution data publisher fails to connect.
+     */
+    public void startPollutionMonitor() throws MqttException {
+        if (pollutionMonitor != null) {
+            pollutionMonitor.start();
+            logger.info("Pollution Monitor started for Plant {}.", selfInfo.plantId());
+        }
     }
 
     /**
@@ -63,39 +103,30 @@ public class ServiceManager {
      * @param knownPlants A list of plants to notify.
      */
     public void announcePresenceTo(List<PowerPlantInfo> knownPlants) {
+        if (knownPlants.isEmpty()) {
+            logger.info("No other plants to announce presence to.");
+            return;
+        }
         logger.info("Announcing presence to {} known plants...", knownPlants.size());
         for (PowerPlantInfo otherPlant : knownPlants) {
             grpcClient.announcePresence(otherPlant, selfInfo);
         }
     }
 
-    public void startGrpcServer() throws PortInUseException {
-        try {
-            PlantGrpcService plantGrpcService = new PlantGrpcService(powerPlant, electionManager);
-            grpcServer = ServerBuilder.forPort(selfInfo.port())
-                    .addService(plantGrpcService)
-                    .build()
-                    .start();
-            logger.info("gRPC Server started for plant {} on port {}", selfInfo.plantId(), selfInfo.port());
-        } catch (IOException e) {
-            // Check for the specific cause of the failure
-            if (e.getCause() instanceof BindException) {
-                throw new PortInUseException("Port " + selfInfo.port() + " is already in use.", e);
-            }
-            // For other unexpected IO errors, wrap in a runtime exception
-            throw new RuntimeException("Failed to start gRPC server due to an unexpected I/O error.", e);
+    /**
+     * Shuts down all managed services in a graceful and controlled order.
+     */
+    public void shutdownServices() {
+        logger.info("Shutting down all services for Plant {}...", selfInfo.plantId());
+        // Stop components that run as separate threads or have external connections first.
+        stopMqttSubscriber();
+        if (pollutionMonitor != null) {
+            pollutionMonitor.stop();
         }
-    }
-
-    public  void startMqttSubscriber() throws MqttException {
-        energyRequestSubscriber = new EnergyRequestSubscriber(
-                mqttBrokerUrl,
-                selfInfo.plantId() + "_subscriber",
-                energyRequestTopic,
-                powerPlant
-        );
-        energyRequestSubscriber.start();
-        logger.info("MQTT Subscriber started for plant {} on topic {}", selfInfo.plantId(), energyRequestTopic);
+        // Then shut down network clients and servers.
+        shutdownGrpcClient();
+        shutdownGrpcServer();
+        logger.info("All services for Plant {} have been shut down.", selfInfo.plantId());
     }
 
     private void stopMqttSubscriber() {
@@ -118,22 +149,4 @@ public class ServiceManager {
             logger.debug("Shut down gRPC client for plant {}", selfInfo.plantId());
         }
     }
-
-//    /**
-//     * A utility method to safely interrupt and join a thread.
-//     *
-//     * @param thread     The thread to stop.
-//     * @param threadName A descriptive name for logging.
-//     * @param plantId    The ID of the plant for logging context.
-//     */
-//    public static void interruptAndJoinThread(Thread thread, String threadName, int plantId) {
-//        if (thread == null) return;
-//        thread.interrupt();
-//        try {
-//            thread.join(THREAD_JOIN_TIMEOUT_MS);
-//        } catch (InterruptedException e) {
-//            Thread.currentThread().interrupt();
-//            logger.warn("Interrupted while joining {} thread for plant {}.", threadName, plantId);
-//        }
-//    }
 }

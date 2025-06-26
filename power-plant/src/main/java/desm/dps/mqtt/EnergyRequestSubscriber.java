@@ -10,15 +10,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles subscribing to an MQTT topic to receive energy requests.
- * This class is responsible for establishing a connection to the MQTT broker,
- * subscribing to a specific topic, and processing incoming messages by deserializing
- * them into EnergyRequest objects and forwarding them to the PowerPlant.
+ * Manages the connection to an MQTT broker to subscribe to a topic for energy requests.
+ * It listens for messages, deserializes them into {@link EnergyRequest} objects,
+ * and passes them to the {@link PowerPlant} for processing.
  */
 public class EnergyRequestSubscriber implements MqttCallback {
 
     private static final Logger logger = LoggerFactory.getLogger(EnergyRequestSubscriber.class);
 
+    // QoS 2 ensures that each message is received exactly once.
     private static final int QOS_LEVEL = 2;
 
     private final String brokerUri;
@@ -27,15 +27,15 @@ public class EnergyRequestSubscriber implements MqttCallback {
     private final PowerPlant powerPlant;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private volatile MqttClient mqttClient;
+    private MqttClient mqttClient;
 
     /**
      * Constructs a new EnergyRequestSubscriber.
      *
-     * @param brokerUri   The full URI of the MQTT broker (e.g., "tcp://localhost:1883").
-     * @param clientId    A unique identifier for this MQTT client.
-     * @param topic       The topic to subscribe to for energy requests.
-     * @param powerPlant  The PowerPlant instance that will handle the received requests.
+     * @param brokerUri  The full URI of the MQTT broker (e.g., "tcp://localhost:1883").
+     * @param clientId   A unique identifier for this MQTT client.
+     * @param topic      The MQTT topic to subscribe to for energy requests.
+     * @param powerPlant The PowerPlant instance that will handle the received requests.
      */
     public EnergyRequestSubscriber(String brokerUri, String clientId, String topic, PowerPlant powerPlant) {
         this.brokerUri = brokerUri;
@@ -50,11 +50,13 @@ public class EnergyRequestSubscriber implements MqttCallback {
      * @throws MqttException if connecting or subscribing fails.
      */
     public void start() throws MqttException {
-        // Use a persistent memory store for QoS 1 and 2 messages.
+        // Use a persistent file store for QoS 1 and 2 message states.
         MqttClientPersistence persistence = new MqttDefaultFilePersistence();
         mqttClient = new MqttClient(brokerUri, clientId, persistence);
 
-        MqttConnectOptions connOpts = createConnectionOptions();
+        MqttConnectOptions connOpts = new MqttConnectOptions();
+        connOpts.setCleanSession(true);
+        connOpts.setAutomaticReconnect(true);
 
         logger.info("Connecting to MQTT broker at {} with client ID '{}'", brokerUri, clientId);
         mqttClient.setCallback(this);
@@ -67,37 +69,23 @@ public class EnergyRequestSubscriber implements MqttCallback {
     }
 
     /**
-     * Creates and configures the connection options for the MQTT client.
-     *
-     * @return A configured MqttConnectOptions object.
-     */
-    private MqttConnectOptions createConnectionOptions() {
-        MqttConnectOptions connOpts = new MqttConnectOptions();
-        connOpts.setCleanSession(true);
-        connOpts.setAutomaticReconnect(true);
-        return connOpts;
-    }
-
-    /**
-     * Unsubscribes from the topic, disconnects from the broker, and closes the client.
-     * This method is safe to call even if the client is already disconnected.
+     * Gracefully unsubscribes from the topic, disconnects from the broker, and closes the client.
      */
     public void stop() {
-        MqttClient client = this.mqttClient;
-        if (client != null && client.isConnected()) {
+        if (this.mqttClient != null && this.mqttClient.isConnected()) {
             try {
                 logger.info("Unsubscribing from topic '{}' for client '{}'", topic, clientId);
-                client.unsubscribe(topic);
+                mqttClient.unsubscribe(topic);
                 logger.info("Disconnecting client '{}' from MQTT broker.", clientId);
-                client.disconnect();
-                logger.info("Successfully disconnected.");
+                mqttClient.disconnect();
+                logger.info("Successfully disconnected MQTT client.");
             } catch (MqttException e) {
-                logger.error("Error during MQTT disconnection for client '{}': {}", clientId, e.getMessage(), e);
+                logger.error("Error during MQTT disconnection for client '{}'", clientId, e);
             } finally {
                 try {
-                    client.close();
+                    mqttClient.close();
                 } catch (MqttException e) {
-                    logger.error("Error closing MQTT client '{}': {}", clientId, e.getMessage(), e);
+                    logger.error("Error closing MQTT client '{}'", clientId, e);
                 }
             }
         }
@@ -105,6 +93,7 @@ public class EnergyRequestSubscriber implements MqttCallback {
 
     @Override
     public void connectionLost(Throwable cause) {
+        // The Paho client's automatic reconnect feature will handle reconnection attempts.
         logger.error("MQTT connection lost for client '{}'. Cause: {}", clientId, cause.getMessage(), cause);
     }
 
@@ -112,7 +101,7 @@ public class EnergyRequestSubscriber implements MqttCallback {
     public void messageArrived(String topic, MqttMessage message) {
         try {
             String payload = new String(message.getPayload());
-            logger.info("Energy request received on topic '{}':\n{}", topic, payload);
+            System.out.println(payload);
 
             EnergyRequest energyRequest = objectMapper.readValue(payload, EnergyRequest.class);
 
@@ -121,10 +110,10 @@ public class EnergyRequestSubscriber implements MqttCallback {
                 logger.debug("Forwarding valid energy request with ID '{}' for processing.", energyRequest.requestID());
                 powerPlant.handleIncomingEnergyRequest(energyRequest);
             } else {
-                logger.warn("Invalid or malformed energy request received. Payload: {}", payload);
+                logger.warn("Received invalid or malformed energy request. Payload: {}", payload);
             }
         } catch (JsonProcessingException e) {
-            logger.error("Failed to deserialize JSON payload on topic '{}'. Error: {}", topic, e.getMessage());
+            logger.error("Failed to deserialize JSON payload on topic '{}'. Payload: '{}'", topic, new String(message.getPayload()), e);
         } catch (Exception e) {
             logger.error("An unexpected error occurred while processing MQTT message on topic '{}'.", topic, e);
         }
@@ -132,5 +121,6 @@ public class EnergyRequestSubscriber implements MqttCallback {
 
     @Override
     public void deliveryComplete(IMqttDeliveryToken token) {
+        // Not used for a subscriber-only client.
     }
 }

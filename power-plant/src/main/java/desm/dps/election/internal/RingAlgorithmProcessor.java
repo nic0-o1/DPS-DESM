@@ -6,136 +6,123 @@ import desm.dps.election.model.ElectionState;
 import desm.dps.grpc.Bid;
 import desm.dps.grpc.ElectCoordinatorToken;
 import desm.dps.grpc.EnergyWinnerAnnouncement;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * Encapsulates the core logic of the ring-based election algorithm.
- *
+ * Implements the core logic of the ring-based election algorithm.
+ * This class is responsible for initiating an election, forwarding tokens,
+ * and completing the election once a full circle has been made.
  */
 public final class RingAlgorithmProcessor {
 
+    private static final Logger logger = LoggerFactory.getLogger(RingAlgorithmProcessor.class);
+
     private final PowerPlant powerPlant;
-
     private final ElectionCommunicator communicator;
+    private final ElectionCompletionHandler localProcessor;
 
-    /**
-     * Constructs a processor for the ring election algorithm.
-     *
-     * @param powerPlant   The main PowerPlant instance, providing context and state.
-     * @param communicator The communication handler for sending messages to other plants.
-     */
-    public RingAlgorithmProcessor(PowerPlant powerPlant, ElectionCommunicator communicator) {
+    public RingAlgorithmProcessor(PowerPlant powerPlant, ElectionCommunicator communicator, ElectionCompletionHandler localProcessor) {
         this.powerPlant = powerPlant;
         this.communicator = communicator;
+        this.localProcessor = localProcessor;
     }
 
     /**
-     * Starts a new election process.
-     * This method is called by the plant that first receives or creates an energy request.
-     * It creates the initial election token, includes its own bid, and forwards it
-     * to the next plant in the ring.
+     * Initiates an election for a given energy request.
+     * It sets this plant's bid as the initial best bid and creates the election token.
+     * The process may abort if a better bid is received from another concurrent process
+     * before the token can be sent.
      *
-     * @param state The state object for the election being initiated.
+     * @param state The current state of the election.
      */
     public void initiate(ElectionState state) {
         int selfId = powerPlant.getSelfInfo().plantId();
-
-        // Create this plant's own bid for the energy request.
         Bid myBid = createBid(selfId, state.getMyBid());
 
-        // The initiator immediately considers its own bid as the best one seen so far.
+        // Atomically update the best bid to our own.
         state.updateBestBid(myBid);
 
-        // Create the election token that will circulate the ring.
-        ElectCoordinatorToken token = createToken(selfId, state, myBid);
+        // Re-check: if our bid is no longer the best, another thread has updated it.
+        // This is an intentional design to handle concurrent bid updates safely.
+        if (state.getBestBid().getPlantId() != selfId) {
+            logger.warn("Aborting election initiation for ER {}. A better bid from Plant {} was received concurrently.",
+                    state.getRequest().requestID(), state.getBestBid().getPlantId());
+            return;
+        }
+
+        ElectCoordinatorToken token = createToken(selfId, state, state.getBestBid());
         PowerPlantInfo nextPlant = powerPlant.getNextPlantInRing(selfId);
 
-        // Handle the edge case of a single-node ring. If this plant is the only one,
-        // the election completes immediately.
+        // If there's no next plant or we are the only one, complete the election immediately.
         if (nextPlant == null || nextPlant.plantId() == selfId) {
+            logger.info("Initiating and completing election for ER {} locally (single node case).", state.getRequest().requestID());
             complete(state, token);
             return;
         }
 
-        // Forward the token to the next participant to continue the election.
+        logger.info("Initiating election for ER {}. Forwarding token to next plant {}.", token.getEnergyRequestId(), nextPlant.plantId());
         communicator.forwardToken(nextPlant, token);
     }
 
     /**
-     * Processes an incoming election token from another plant.
-     * This plant compares the best bid in the token with its own bid, updates the token
-     * if its bid is better, and then forwards the token to the next plant.
+     * Forwards an election token received from another plant.
+     * The best bid in the local state is updated before passing the token along.
      *
-     * @param state         The state object for the ongoing election.
-     * @param incomingToken The election token received from the previous plant in the ring.
+     * @param state         The current state of the election.
+     * @param incomingToken The token received from the previous plant in the ring.
      */
     public void forward(ElectionState state, ElectCoordinatorToken incomingToken) {
-        // First, update the local state with the best bid seen so far from the token.
         state.updateBestBid(incomingToken.getBestBid());
-        Bid bestBid = state.getBestBid();
 
-        // If this plant has a valid bid, it should participate.
-        if (state.isValidBid()) {
-            Bid myBid = createBid(powerPlant.getSelfInfo().plantId(), state.getMyBid());
+        int selfId = powerPlant.getSelfInfo().plantId();
+        PowerPlantInfo nextPlantInRing = powerPlant.getNextPlantInRing(selfId);
 
-            // If this plant's bid is better than the current best, update the best bid.
-            if (state.updateBestBid(myBid)) {
-                bestBid = state.getBestBid(); // The best bid is now our bid.
-            }
+        if (nextPlantInRing == null) {
+            logger.warn("Cannot forward token for ER '{}'; no next plant found in ring.", incomingToken.getEnergyRequestId());
+            // The election will stall here until the ring topology is fixed.
+            return;
         }
 
-        ElectCoordinatorToken forwardToken = incomingToken.toBuilder().setBestBid(bestBid).build();
-        PowerPlantInfo nextPlantInRing = powerPlant.getNextPlantInRing(powerPlant.getSelfInfo().plantId());
-
-        communicator.forwardToken(nextPlantInRing, forwardToken);
+        logger.debug("Forwarding token for ER '{}' from initiator {} to plant {}.",
+                incomingToken.getEnergyRequestId(), incomingToken.getInitiatorId(), nextPlantInRing.plantId());
+        communicator.forwardToken(nextPlantInRing, incomingToken);
     }
 
     /**
-     * Completes the election process.
-     * This method is called when the election token has returned to the initiator.
-     * It determines the final winner and initiates a new ring-based message to announce the result.
-     * If this plant is the winner, it also fulfills the energy request.
+     * Completes an election after the token has returned to the initiator.
+     * It finalizes the best bid, creates a winner announcement, and processes it locally.
      *
-     * @param state The state object for the election being completed.
-     * @param token The final election token after circulating the entire ring.
-     * @return {@code true} if this call successfully started the announcement; {@code false} if the
-     *         winner was already announced.
+     * @param state The current state of the election.
+     * @param token The election token that has completed its circulation.
+     * @return {@code true} if the election was successfully completed, {@code false} if a winner
+     *         was already announced by a concurrent process.
      */
     public boolean complete(ElectionState state, ElectCoordinatorToken token) {
         state.updateBestBid(token.getBestBid());
-        Bid winnerBid = state.getBestBid();
-        int selfId = powerPlant.getSelfInfo().plantId();
 
-        if (state.trySetWinnerAnnounced()) {
-            if (winnerBid.getPlantId() == selfId) {
-                powerPlant.fulfillEnergyRequest(state.getRequest(), winnerBid.getPrice());
-            }
-
-
-            EnergyWinnerAnnouncement announcement = EnergyWinnerAnnouncement.newBuilder()
-                    .setWinningPlantId(winnerBid.getPlantId())
-                    .setWinningPrice(winnerBid.getPrice())
-                    .setEnergyRequestId(state.getRequest().requestID())
-                    .setInitiatorId(selfId) // Set initiator for circulation control
-                    .build();
-
-            PowerPlantInfo nextPlant = powerPlant.getNextPlantInRing(selfId);
-            communicator.forwardWinnerAnnouncement(nextPlant, announcement);
-
-            return true;
+        if (!state.trySetWinnerAnnounced()) {
+            logger.warn("Completion for ER {} aborted; a winner was already announced.", token.getEnergyRequestId());
+            return false;
         }
-        return false;
+
+        EnergyWinnerAnnouncement announcement = EnergyWinnerAnnouncement.newBuilder()
+                .setWinningPlantId(state.getBestBid().getPlantId())
+                .setWinningPrice(state.getBestBid().getPrice())
+                .setEnergyRequestId(state.getRequest().requestID())
+                .setInitiatorId(token.getInitiatorId())
+                .build();
+
+        logger.info("Completing election for ER {}. Winner is Plant {} with price {}. Processing result.",
+                announcement.getEnergyRequestId(), announcement.getWinningPlantId(), announcement.getWinningPrice());
+        localProcessor.process(announcement);
+        return true;
     }
 
-    /**
-     * Private helper to create a gRPC Bid message.
-     */
     private Bid createBid(int plantId, double price) {
         return Bid.newBuilder().setPlantId(plantId).setPrice(price).build();
     }
 
-    /**
-     * Private helper to create the initial gRPC election token.
-     */
     private ElectCoordinatorToken createToken(int selfId, ElectionState state, Bid bestBid) {
         return ElectCoordinatorToken.newBuilder()
                 .setInitiatorId(selfId)

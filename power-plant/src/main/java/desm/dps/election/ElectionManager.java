@@ -17,17 +17,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 /**
- * Manages the leader election process for a power plant.
- * This class acts as the central hub for all election-related events, such as
- * new energy requests, incoming election tokens, and winner announcements. It orchestrates
- * the logic of the ring-based election algorithm by delegating tasks to specialized
- * internal components.
+ * Central coordinator for election processes in the distributed energy system.
+ * Manages election lifecycle, handles incoming tokens, and processes winner announcements.
  */
 public class ElectionManager {
 	private static final Logger logger = LoggerFactory.getLogger(ElectionManager.class);
-
-	/** A special value indicating that the plant will not place a competitive bid. */
-	private static final double INVALID_BID_PRICE = -1.0;
 
 	private static final int TEST_SLEEP_DURATION_MS = 22000;
 
@@ -36,156 +30,220 @@ public class ElectionManager {
 	private final RingAlgorithmProcessor algorithmProcessor;
 	private final ElectionCommunicator communicator;
 
-	/**
-	 * Constructs an ElectionManager for a given power plant.
-	 *
-	 * @param powerPlant The power plant this manager belongs to.
-	 * @param grpcClient The gRPC client for communicating with other plants.
-	 */
 	public ElectionManager(PowerPlant powerPlant, PlantGrpcClient grpcClient) {
 		this.powerPlant = powerPlant;
-		// A dedicated thread for cleaning up old election states.
 		ScheduledExecutorService cleanupExecutor = Executors.newScheduledThreadPool(1,
 				r -> new Thread(r, "ElectionCleanup"));
 		this.communicator = new ElectionCommunicator(grpcClient);
 		this.stateRepository = new ElectionStateRepository(cleanupExecutor);
-		this.algorithmProcessor = new RingAlgorithmProcessor(powerPlant, this.communicator);
+		this.algorithmProcessor = new RingAlgorithmProcessor(powerPlant, this.communicator,
+				this::handleMyInitiatedElectionCompletion);
 	}
 
 	/**
-	 * Processes a new energy request, potentially initiating a new election.
-	 * @param energyRequest The details of the energy request.
+	 * Starts an active election for a new energy request.
+	 * Synchronizes on election state to prevent concurrent initiation.
 	 */
-	public void processNewEnergyRequest(EnergyRequest energyRequest) {
-		// performTestSleep();
+	public void startActiveElection(EnergyRequest energyRequest) {
+		final int selfId = powerPlant.getSelfInfo().plantId();
+//		if (selfId == 1 || selfId == 2) {
+//			performTestSleep();
+//		}
+		final String requestId = energyRequest.requestID();
+
+		ElectionState state = stateRepository.get(requestId);
+		if (state == null) {
+			final double price = powerPlant.generatePrice();
+			state = stateRepository.getOrCreate(requestId, energyRequest, price);
+		}
+
+		synchronized (state.getStateLock()) {
+			if (state.isParticipant()) {
+				logger.debug("Aborting election initiation for {}: already a participant.", requestId);
+				return;
+			}
+
+			state.becomeParticipant();
+			logger.info("Plant {} generated price ${} for request {} and is INITIATING ELECTION.",
+					selfId, String.format("%.2f", state.getMyBid()), requestId);
+			algorithmProcessor.initiate(state);
+		}
+	}
+
+	/**
+	 * Starts an election for a dequeued energy request when the plant becomes available.
+	 * Generates a new price and initiates election if not already participating.
+	 */
+	public void startElectionForDequeuedRequest(EnergyRequest energyRequest) {
 		final int selfId = powerPlant.getSelfInfo().plantId();
 		final String requestId = energyRequest.requestID();
-		logger.debug("Plant {} processing new energy request {}", selfId, requestId);
 
-		// Determine the bid price. If the plant is busy, it participates passively with an invalid price.
-		final double price = powerPlant.isBusy() ? INVALID_BID_PRICE : powerPlant.generatePrice();
-		final ElectionState state = stateRepository.getOrCreate(requestId, energyRequest, price);
-
-		if (!state.isValidBid()) {
-			logger.info("Plant {} is busy; participating passively in election for request {}.", selfId, requestId);
+		ElectionState state = stateRepository.get(requestId);
+		if (state != null && state.isWinnerAnnounced()) {
+			logger.info("Not starting election for dequeued request {}, a winner was already decided.", requestId);
 			return;
 		}
 
-		if (state.trySetInitiated()) {
-			logger.info("Plant {} generated price ${} for request {}", selfId, price, energyRequest.requestID());
+		final double price = powerPlant.generatePrice();
+		state = stateRepository.getOrCreate(requestId, energyRequest, price);
+		state.updateMyBid(price);
+
+		synchronized (state.getStateLock()) {
+			if (state.isParticipant()) {
+				logger.debug("Aborting dequeued election for {}: already a participant.", requestId);
+				return;
+			}
+			state.becomeParticipant();
+			logger.info("Plant {} (now free) generated price ${} for dequeued request {} and is INITIATING ELECTION.",
+					selfId, String.format("%.2f", price), requestId);
 			algorithmProcessor.initiate(state);
-		} else {
-			// This occurs if we receive the same request again after already initiating or participating.
-			logger.info("Plant {} ignoring duplicate energy request for {}.", selfId, requestId);
 		}
 	}
 
 	/**
-	 * Handles an incoming election token as part of the ring algorithm.
-	 * @param token The election token received from another plant.
+	 * Handles incoming election tokens from other plants.
+	 * Determines whether to complete election (if initiator), forward without participating (if busy),
+	 * or participate in the election by comparing bids.
 	 */
 	public void handleElectionToken(ElectCoordinatorToken token) {
 		final int selfId = powerPlant.getSelfInfo().plantId();
 		final String requestId = token.getEnergyRequestId();
-		logger.trace("Plant {} received election token for request {}.", selfId, requestId);
 
 		if (selfId == token.getInitiatorId()) {
-			logger.debug("Plant {} (initiator) received its completed token for request {}.", selfId, requestId);
 			ElectionState state = stateRepository.get(requestId);
-
-			if (state == null) {
-				logger.error("CRITICAL: Plant {} (initiator) has no state for its own election {}. Dropping token.", selfId, requestId);
-				return;
+			if (state != null) {
+				algorithmProcessor.complete(state, token);
 			}
+			return;
+		}
 
+		if (powerPlant.isBusy()) {
+			logger.info("Plant {} is busy, forwarding election token {} without participating.",
+					selfId, requestId);
+			PowerPlantInfo nextPlant = powerPlant.getNextPlantInRing(selfId);
+			if (nextPlant != null) communicator.forwardToken(nextPlant, token);
+			return;
+		}
+
+		ElectionState state = stateRepository.getOrCreateFromToken(
+				requestId, token.getEnergyAmountKwh(), powerPlant.generatePrice()
+		);
+
+		synchronized (state.getStateLock()) {
 			if (state.isWinnerAnnounced()) {
-				logger.info("Plant {} (initiator) ignoring completed token for request {}, as winner is already known.", selfId, requestId);
+				logger.debug("Plant {} dropping token for request {}, winner already announced.",
+						selfId, requestId);
 				return;
 			}
 
-			if (algorithmProcessor.complete(state, token)) {
-				stateRepository.scheduleCleanup(requestId);
-			}
-			return;
-		}
+			double myPrice = state.getMyBid();
+			double tokenPrice = token.getBestBid().getPrice();
+			boolean amIStronger = myPrice < tokenPrice ||
+					(myPrice == tokenPrice && selfId > token.getBestBid().getPlantId());
 
-		logger.debug("Plant {} (participant) processing token for request {}.", selfId, requestId);
-		ElectionState state = stateRepository.get(requestId);
-
-
-		if (state == null) {
-			logger.info("Plant {} is joining election for request {} initiated by plant {}.", selfId, requestId, token.getInitiatorId());
-
-			double myPrice = powerPlant.isBusy() ? INVALID_BID_PRICE : powerPlant.generatePrice();
-
-			EnergyRequest request = new EnergyRequest(requestId, (int) token.getEnergyAmountKwh(), System.currentTimeMillis());
-
-			state = stateRepository.getOrCreate(requestId, request, myPrice);
-
-			if (state.isValidBid()) {
-				logger.info("Plant {} (participant) generated a bid of ${} for request {}.", selfId, myPrice, requestId);
+			if (!state.isParticipant()) {
+				state.becomeParticipant();
+				if (amIStronger) {
+					logger.info("Late Joiner: Plant {} (bid ${}) is stronger than token (bid ${}). Starting my own election.",
+							selfId, String.format("%.2f", myPrice), String.format("%.2f", tokenPrice));
+					algorithmProcessor.initiate(state);
+				} else {
+					logger.info("Late Joiner: Plant {} (bid ${}) is yielding to token (bid ${}). Forwarding.",
+							selfId, String.format("%.2f", myPrice), String.format("%.2f", tokenPrice));
+					algorithmProcessor.forward(state, token);
+				}
 			} else {
-				logger.info("Plant {} is busy; participating passively in election for request {}.", selfId, requestId);
+				if (amIStronger) {
+					logger.info("Participant: Plant {} (bid ${}) DISCARDING weaker incoming token (bid ${}).",
+							selfId, String.format("%.2f", myPrice), String.format("%.2f", tokenPrice));
+				} else {
+					state.updateBestBid(token.getBestBid());
+					logger.info("Participant: Plant {} (bid ${}) is yielding to and forwarding stronger token (bid ${}).",
+							selfId, String.format("%.2f", myPrice), String.format("%.2f", tokenPrice));
+					algorithmProcessor.forward(state, token);
+				}
 			}
 		}
-
-
-		// If a winner is already known (e.g., from a faster, concurrent election), drop this token.
-		if (state.isWinnerAnnounced()) {
-			logger.debug("Plant {} dropping token for request {}, winner already announced.", selfId, requestId);
-			return;
-		}
-
-		// Update the token with our bid if applicable and forward it to the next plant.
-		algorithmProcessor.forward(state, token);
 	}
 
 	/**
-	 * Processes a winner announcement received from another plant.
-	 * @param announcement The winner announcement message.
+	 * Handles completion of elections that this plant initiated.
+	 * Processes the winner announcement and forwards it to continue circulation.
+	 */
+	private void handleMyInitiatedElectionCompletion(EnergyWinnerAnnouncement announcement) {
+		final int selfId = powerPlant.getSelfInfo().plantId();
+		final String requestId = announcement.getEnergyRequestId();
+		final int winnerId = announcement.getWinningPlantId();
+
+		ElectionState state = stateRepository.get(requestId);
+		if (state == null) {
+			logger.warn("Processing completion for request {}, but state is missing.", requestId);
+			return;
+		}
+
+		logger.info("Election for request {} that I initiated has concluded. Final Winner is Plant {}.",
+				requestId, winnerId);
+
+		if (winnerId == selfId) {
+			if (!state.isValidBid()) {
+				logger.error("VICTORY-ERROR! This plant ({}) won election for {} but with an invalid bid of ${}! Aborting fulfillment.",
+						selfId, requestId, state.getMyBid());
+			} else {
+				logger.info("VICTORY! This plant ({}) won the election for request {}. Fulfilling energy request.",
+						selfId, requestId);
+				powerPlant.fulfillEnergyRequest(state.getRequest(), announcement.getWinningPrice());
+			}
+		} else {
+			logger.info("This plant ({}) lost the election it initiated for request {}. The winner was Plant {}.",
+					selfId, requestId, winnerId);
+		}
+
+		PowerPlantInfo nextPlant = powerPlant.getNextPlantInRing(selfId);
+		if (nextPlant != null && nextPlant.plantId() != selfId) {
+			communicator.forwardWinnerAnnouncement(nextPlant, announcement);
+		}
+
+		stateRepository.scheduleCleanup(requestId);
+	}
+
+	/**
+	 * Processes winner announcements received from other plants.
+	 * Handles acknowledgment, request queue cleanup, and continues circulation to next plant.
 	 */
 	public void processEnergyWinnerAnnouncement(EnergyWinnerAnnouncement announcement) {
 		final int selfId = powerPlant.getSelfInfo().plantId();
 		final String requestId = announcement.getEnergyRequestId();
-		final int winnerId = announcement.getWinningPlantId();
-		final int announcementInitiatorId = announcement.getInitiatorId(); // The plant that determined the winner.
+		final int announcementInitiatorId = announcement.getInitiatorId();
 
-		logger.trace("Plant {} received winner announcement for request {}.", selfId, requestId);
-
-		// If this plant originated the announcement, it has completed the ring. Stop circulation.
 		if (selfId == announcementInitiatorId) {
-			logger.info("Winner announcement for request {} completed its circulation back to initiator {}.", requestId, selfId);
+			logger.info("Winner announcement for request {} completed its circulation back to initiator {}. Halting propagation.",
+					requestId, selfId);
 			return;
 		}
 
 		ElectionState state = stateRepository.get(requestId);
 		if (state == null) {
-			// This can happen if the plant's local state timed out and was cleaned up before the
-			// announcement arrived. Announcement must be forwarded to maintain ring integrity.
-			logger.warn("Plant {} received winner announcement for an unknown or cleaned-up request {}. Forwarding to preserve ring communication.", selfId, requestId);
-			PowerPlantInfo nextPlant = powerPlant.getNextPlantInRing(selfId);
-			communicator.forwardWinnerAnnouncement(nextPlant, announcement);
-			return;
+			logger.info("Plant {} acknowledges winner {} for request {} (was not an active participant).",
+					selfId, announcement.getWinningPlantId(), requestId);
+			powerPlant.removeRequestFromQueue(requestId);
+		} else {
+			if (state.trySetWinnerAnnounced()) {
+				logger.info("Plant {} acknowledges winner {} for request {} with price ${}.",
+						selfId, announcement.getWinningPlantId(), requestId,
+						String.format("%.2f", announcement.getWinningPrice()));
+				if (announcement.getWinningPlantId() != selfId) {
+					powerPlant.removeRequestFromQueue(requestId);
+				}
+				stateRepository.scheduleCleanup(requestId);
+			} else {
+				logger.debug("Plant {} already processed winner for request {}. Ignoring duplicate announcement.",
+						selfId, requestId);
+			}
 		}
 
-		if (state.trySetWinnerAnnounced()) {
-			logger.info("Plant {} acknowledges winner {} for request {} with price ${}.", selfId, winnerId, requestId, announcement.getWinningPrice());
-
-			// If this plant is the winner, it fulfills the request.
-			if (winnerId == selfId) {
-				logger.info("VICTORY! This plant ({}) won the election for request {}. Fulfilling energy request.", selfId, requestId);
-				powerPlant.fulfillEnergyRequest(state.getRequest(), announcement.getWinningPrice());
-			}
-
-			// Forward the announcement to the next plant in the ring.
-			PowerPlantInfo nextPlant = powerPlant.getNextPlantInRing(selfId);
+		PowerPlantInfo nextPlant = powerPlant.getNextPlantInRing(selfId);
+		if (nextPlant != null) {
 			communicator.forwardWinnerAnnouncement(nextPlant, announcement);
-
-			// This plant's role in this election is complete. Schedule local state for cleanup.
-			stateRepository.scheduleCleanup(requestId);
-		} else {
-			// This is expected if the announcement is received more than once.
-			logger.debug("Plant {} already processed winner for request {}. Ignoring duplicate announcement.", selfId, requestId);
 		}
 	}
 

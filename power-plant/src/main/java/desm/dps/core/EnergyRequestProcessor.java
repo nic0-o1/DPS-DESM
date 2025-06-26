@@ -8,22 +8,15 @@ import org.slf4j.LoggerFactory;
 import java.util.LinkedList;
 import java.util.Queue;
 
-/**
- * Manages the state and processing logic for energy requests. This class encapsulates
- * the busy state of the plant, a queue for pending requests, and the logic
- * for simulating energy production.
- */
 public class EnergyRequestProcessor {
     private static final Logger logger = LoggerFactory.getLogger(EnergyRequestProcessor.class);
+    private static final int PRODUCTION_MULTIPLIER = 7;  // for test only
 
     private final int selfPlantId;
     private final ElectionManager electionManager;
-
-    // --- State variables protected by synchronization ---
     private volatile boolean isBusy = false;
     private volatile String currentRequestId = null;
     private final Object processingLock = new Object();
-
     private final Queue<EnergyRequest> pendingRequests = new LinkedList<>();
     private final Object pendingRequestsLock = new Object();
 
@@ -33,41 +26,35 @@ public class EnergyRequestProcessor {
     }
 
     /**
-     * Processes an incoming request. If the plant is not busy, it initiates an election.
-     * If the plant is busy, the request is queued for later processing.
-     *
-     * @param energyRequest The request to process.
+     * -- REVISED LOGIC --
+     * This method is now only called by the PowerPlant facade when it has determined
+     * the plant is NOT busy. It immediately starts an election for the request.
      */
-    public void processIncomingRequest(EnergyRequest energyRequest) {
-        boolean processedImmediately;
-        synchronized (processingLock) {
-            if (!isBusy) {
-                electionManager.processNewEnergyRequest(energyRequest);
-                processedImmediately = true;
-            } else {
-                processedImmediately = false;
-            }
-        }
+    public void startElectionForNewRequest(EnergyRequest energyRequest) {
+        // No isBusy check needed here, the decision was made by the caller.
+        electionManager.startActiveElection(energyRequest);
+    }
 
-        if (!processedImmediately) {
-            // if busy, queue the request
-            synchronized (pendingRequestsLock) {
+    /**
+     * -- REVISED LOGIC --
+     * This method is now only called by the PowerPlant facade when it has determined
+     * the plant IS busy.
+     */
+    public void queueRequest(EnergyRequest energyRequest) {
+        synchronized (pendingRequestsLock) {
+            // Prevent adding the same request ID to the queue multiple times.
+            if (pendingRequests.stream().noneMatch(r -> r.requestID().equals(energyRequest.requestID()))) {
                 pendingRequests.add(energyRequest);
                 logger.info("Plant {} is busy. Queued request {}. Queue size: {}",
                         selfPlantId, energyRequest.requestID(), pendingRequests.size());
+            } else {
+                logger.warn("Request {} is already in the queue. Ignoring duplicate queue attempt.", energyRequest.requestID());
             }
         }
     }
-    /**
-     * Removes a request from the pending queue by its ID. This is called when another
-     * plant has won the election for this request, making the queued item obsolete.
-     *
-     * @param requestId The ID of the request to remove.
-     */
+
     public void removeRequestById(String requestId) {
-        if (requestId == null || requestId.isEmpty()) {
-            return;
-        }
+        if (requestId == null || requestId.isEmpty()) return;
         synchronized (pendingRequestsLock) {
             boolean removed = pendingRequests.removeIf(req -> requestId.equals(req.requestID()));
             if (removed) {
@@ -76,57 +63,49 @@ public class EnergyRequestProcessor {
         }
     }
 
-    /**
-     * Fulfills a request after winning the bid. Sets the plant to a busy state
-     * and starts a background thread to simulate energy production.
-     *
-     * @param request The request to fulfill.
-     * @param price The winning bid price.
-     */
     public void fulfillRequest(EnergyRequest request, double price) {
         synchronized (processingLock) {
             if (isBusy) {
                 logger.warn("Attempted to fulfill request {} but plant {} is already busy with {}",
                         request.requestID(), selfPlantId, currentRequestId);
+                // Even if busy, we must remove it from our queue if we somehow won the bid.
+                removeRequestById(request.requestID());
                 return;
             }
             isBusy = true;
             currentRequestId = request.requestID();
         }
 
+        // Before fulfilling, ensure it's not in our own queue. This prevents the double-processing bug.
+        removeRequestById(request.requestID());
+
         logger.info("Plant {} won bid for request {} with price ${}. Fulfilling {} kWh.",
-                selfPlantId, request.requestID(), price, request.amountKWh());
+                selfPlantId, request.requestID(), String.format("%.2f", price), request.amountKWh());
         startEnergyProduction(request);
     }
 
     private void startEnergyProduction(EnergyRequest request) {
         long processingTimeMillis = request.amountKWh();
         logger.info("Energy production for request {} will take ~{} ms.", request.requestID(), processingTimeMillis);
-
         Thread productionThread = new Thread(() -> {
             try {
-                Thread.sleep(processingTimeMillis);
+                Thread.sleep(processingTimeMillis * PRODUCTION_MULTIPLIER);
             } catch (InterruptedException e) {
-                logger.warn("Energy production for request {} was interrupted in plant {}", request.requestID(), selfPlantId);
                 Thread.currentThread().interrupt();
+                logger.warn("Energy production for request {} was interrupted in plant {}", request.requestID(), selfPlantId);
             } finally {
                 logger.info("Plant {} finished fulfilling request {}.", selfPlantId, request.requestID());
                 onProductionFinished();
             }
         }, "EnergyProduction-" + request.requestID());
-
         productionThread.setDaemon(true);
         productionThread.start();
     }
 
-    /**
-     * Called when energy production is complete. It clears the busy state and
-     * processes the next request from the queue, if one exists.
-     */
     private void onProductionFinished() {
-        EnergyRequest nextRequest;
+        EnergyRequest nextRequestToProcess;
         synchronized (pendingRequestsLock) {
-            nextRequest = pendingRequests.poll(); // Dequeue if present
+            nextRequestToProcess = pendingRequests.poll();
         }
 
         synchronized (processingLock) {
@@ -134,29 +113,15 @@ public class EnergyRequestProcessor {
             currentRequestId = null;
         }
 
-        if (nextRequest != null) {
-            logger.info("Processing dequeued request {}.", nextRequest.requestID());
-            processIncomingRequest(nextRequest);
+        if (nextRequestToProcess != null) {
+            logger.info("Processing dequeued request {}.", nextRequestToProcess.requestID());
+            electionManager.startElectionForDequeuedRequest(nextRequestToProcess);
         } else {
             logger.info("No pending requests. Plant {} is now idle.", selfPlantId);
         }
     }
 
-    /**
-     * Checks if the plant is currently busy.
-     *
-     * @return true if busy, false otherwise.
-     */
     public boolean isBusy() {
         return isBusy;
-    }
-
-    /**
-     * Gets the ID of the current request being processed.
-     *
-     * @return The request ID, or null if idle.
-     */
-    public String getCurrentRequestId() {
-        return currentRequestId;
     }
 }

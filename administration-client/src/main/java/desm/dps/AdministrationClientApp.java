@@ -1,6 +1,5 @@
 package desm.dps;
 
-import java.util.InputMismatchException;
 import java.util.Scanner;
 
 /**
@@ -58,20 +57,29 @@ public class AdministrationClientApp {
         System.out.print("Enter your choice (1-3): ");
     }
 
-    /**
-     * Reads and validates the user's menu choice.
-     * Handles non-integer input gracefully.
-     *
-     * @return The integer choice from the user, or -1 if the input was invalid.
-     */
     private int getUserChoice() {
+        // Check if there's any input at all. If the stream is closed, this will be false.
+        if (!scanner.hasNext()) {
+            // The input stream was closed (e.g., by Ctrl+C or Ctrl+D).
+            // Treat this as a signal to exit the application.
+            return 3; // The 'exit' choice.
+        }
+
         try {
-            return scanner.nextInt();
-        } catch (InputMismatchException e) {
-            System.err.println("Invalid input. Please enter a valid number.");
-            return -1;
+            // Check if the next token is an integer.
+            if (scanner.hasNextInt()) {
+                return scanner.nextInt(); // Read the integer.
+            } else {
+                // The input is not an integer.
+                System.err.println("Invalid input. Please enter a valid number.");
+                return -1; // Return an invalid choice.
+            }
         } finally {
-            scanner.nextLine();
+            // IMPORTANT: Consume the rest of the line only if there is a line to consume.
+            // This prevents an error if the user enters a number and immediately closes the stream.
+            if (scanner.hasNextLine()) {
+                scanner.nextLine(); // Consume the trailing newline character or the invalid token.
+            }
         }
     }
 }

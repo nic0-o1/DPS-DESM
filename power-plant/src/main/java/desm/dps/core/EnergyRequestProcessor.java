@@ -10,7 +10,7 @@ import java.util.Queue;
 
 public class EnergyRequestProcessor {
     private static final Logger logger = LoggerFactory.getLogger(EnergyRequestProcessor.class);
-    private static final int PRODUCTION_MULTIPLIER = 7;  // for test only
+    private static final int PRODUCTION_MULTIPLIER = 1;  // for test only
 
     private final int selfPlantId;
     private final ElectionManager electionManager;

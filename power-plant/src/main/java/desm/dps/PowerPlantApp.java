@@ -10,92 +10,139 @@ import java.util.Scanner;
 
 public class PowerPlantApp {
     private static final Logger logger = LoggerFactory.getLogger(PowerPlantApp.class);
+    private static final Scanner scanner = new Scanner(System.in);
+    private static final AppConfig config = AppConfig.getInstance();
 
     public static void main(String[] args) {
+        PowerPlant powerPlant = startPowerPlant();
 
-        AppConfig config = AppConfig.getInstance();
-        Scanner scanner = new Scanner(System.in);
-        System.out.println("===== Power Plant Configuration =====");
+        if (powerPlant == null) {
+            logger.error("Could not start the power plant. Exiting.");
+            System.exit(1);
+        }
 
+        runCommandLoop(powerPlant);
+
+        scanner.close();
+        logger.info("Application shut down.");
+    }
+
+    /**
+     * The main application loop. It orchestrates the entire startup process,
+     * handling retries for different failure scenarios.
+     * @return The successfully started PowerPlant instance, or null if startup fails permanently.
+     */
+    private static PowerPlant startPowerPlant() {
         PowerPlant powerPlant = null;
         int plantId = -1;
-        int plantPort = -1;
+        boolean isFirstAttempt = true; // Flag to control initial header printing
 
         while (true) {
             try {
-                System.out.print("Enter Plant ID: ");
-                plantId = Integer.parseInt(scanner.nextLine().trim());
+                // Only show the main header on the very first run
+                if (isFirstAttempt) {
+                    System.out.println("===== Power Plant Configuration =====");
+                    isFirstAttempt = false; // Set the flag to false after the first run
+                }
 
-                System.out.print("Enter Port: ");
-                plantPort = Integer.parseInt(scanner.nextLine().trim());
+                plantId = getPlantIdFromUser();
+                int plantPort = getPortFromUser();
 
-                String adminServerBaseUrl = config.getAdminServerBaseUrl();
-                String mqttBrokerUrl = config.getMqttBrokerUrl();
-                String energyRequestTopic = config.getEnergyRequestTopic();
-                String pollutionPublishTopic = config.getPollutionPublishTopic();
-
+                // Attempt to create and start the plant.
                 PowerPlantInfo selfInfo = new PowerPlantInfo(plantId, "localhost", plantPort, System.currentTimeMillis());
-                powerPlant = new PowerPlant(selfInfo, adminServerBaseUrl, mqttBrokerUrl, energyRequestTopic, pollutionPublishTopic);
+                powerPlant = new PowerPlant(selfInfo, config.getAdminServerBaseUrl(), config.getMqttBrokerUrl(), config.getEnergyRequestTopic(), config.getPollutionPublishTopic());
 
                 powerPlant.start();
 
-
-                System.out.println("PowerPlant " + plantId + " started successfully");
-                System.out.println("Connected to admin server at: " + adminServerBaseUrl);
-                break;
-
-            } catch (NumberFormatException e) {
-                System.err.println("Error: ID and Port must be valid integers. Please try again.");
+                System.out.println("\nPowerPlant " + plantId + " started successfully.");
+                System.out.println("Connected to admin server at: " + config.getAdminServerBaseUrl());
+                return powerPlant; // Success! Return the instance.
 
             } catch (RegistrationConflictException e) {
-                System.err.println("\n--- REGISTRATION FAILED ---");
-                System.err.println("REASON: " + e.getMessage());
-                System.err.println("Please choose a different Plant ID.\n");
-                if (powerPlant != null) {
-                    powerPlant.shutdown();
-                }
+                if (powerPlant != null) powerPlant.shutdown();
+                System.out.println("\n--- REGISTRATION FAILED ---");
+                System.out.println("REASON: " + e.getMessage());
+                System.out.println("Please choose a different Plant ID.\n");
+                logger.error("STARTUP ERROR: {}", e.getMessage());
 
-            }
-            catch (PortInUseException e) {
-                System.err.println("\n--- STARTUP FAILED ---");
-                System.err.println("REASON: " + e.getMessage());
-                System.err.println("Choose a different Port.\n");
-                if (powerPlant != null) {
-                    powerPlant.shutdown();
-                }
+            } catch (PortInUseException e) {
+                if (powerPlant != null) powerPlant.shutdown();
+                System.out.println("\n--- STARTUP FAILED ---");
+                System.out.println("REASON: " + e.getMessage());
+                System.out.println("Please choose a different Port.\n");
+                logger.error("STARTUP ERROR: {}", e.getMessage());
+
             } catch (Exception e) {
-                logger.error("FATAL STARTUP ERROR: PowerPlant {} could not be started.", plantId, e);
-                if (powerPlant != null) {
-                    powerPlant.shutdown();
-                }
-                scanner.close();
-                System.exit(1);
+                logger.error("FATAL STARTUP ERROR for plant {}: {}", plantId, e.getMessage(), e);
+                if (powerPlant != null) powerPlant.shutdown();
+                return null; // Fatal error, cannot recover.
             }
         }
+    }
 
+    /**
+     * Prompts the user for a Plant ID until a valid integer is provided.
+     * @return The parsed integer ID.
+     */
+    private static int getPlantIdFromUser() {
+        while (true) {
+            try {
+                System.out.print("Enter Plant ID: ");
+                String input = scanner.nextLine().trim();
+                if (input.isEmpty()) {
+                    // *** FIX: Print to System.out to guarantee order ***
+                    System.out.println("Error: Plant ID cannot be empty.");
+                    continue;
+                }
+                return Integer.parseInt(input);
+            } catch (NumberFormatException e) {
+                // *** FIX: Print to System.out to guarantee order ***
+                System.out.println("Error: ID must be a valid integer. Please try again.");
+            }
+        }
+    }
+
+    /**
+     * Prompts the user for a Port number until a valid integer is provided.
+     * @return The parsed integer port.
+     */
+    private static int getPortFromUser() {
+        while (true) {
+            try {
+                System.out.print("Enter Port: ");
+                String input = scanner.nextLine().trim();
+                if (input.isEmpty()) {
+                    // *** FIX: Print to System.out to guarantee order ***
+                    System.out.println("Error: Port cannot be empty.");
+                    continue;
+                }
+                return Integer.parseInt(input);
+            } catch (NumberFormatException e) {
+                // *** FIX: Print to System.out to guarantee order ***
+                System.out.println("Error: Port must be a valid integer. Please try again.");
+            }
+        }
+    }
+
+    /**
+     * Runs the post-startup command loop, waiting for the user to type 'exit'.
+     * @param powerPlant The running power plant instance to be shut down.
+     */
+    private static void runCommandLoop(PowerPlant powerPlant) {
         System.out.println("PowerPlant is running.");
         System.out.println("Enter 'exit' to shut down the PowerPlant:");
 
-        String command;
-        try {
-            while (true) {
-                command = scanner.nextLine().trim().toLowerCase();
-                if (command.equals("exit")) {
-                    break;
-                } else if (!command.isEmpty()) {
-                    System.out.println("Unknown command. Enter 'exit' to shut down.");
-                }
+        while (scanner.hasNextLine()) {
+            String command = scanner.nextLine().trim().toLowerCase();
+            if (command.equals("exit")) {
+                break;
+            } else if (!command.isEmpty()) {
+                System.out.println("Unknown command. Enter 'exit' to shut down.");
             }
+        }
 
-            System.out.println("Shutting down PowerPlant " + plantId + "...");
-            if (powerPlant != null) {
-                powerPlant.shutdown();
-            }
-            System.out.println("PowerPlant " + plantId + " shut down successfully.");
-        } catch (Exception _) {
-        }
-        finally {
-            scanner.close();
-        }
+        System.out.println("Shutting down PowerPlant " + powerPlant.getSelfInfo().plantId() + "...");
+        powerPlant.shutdown();
+        System.out.println("PowerPlant " + powerPlant.getSelfInfo().plantId() + " shut down successfully.");
     }
 }

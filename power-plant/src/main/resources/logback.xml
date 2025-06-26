@@ -17,10 +17,6 @@
         <appender-ref ref="CONSOLE" />
     </root>
 
-    <!-- Specific Logger for PowerPlant class -->
-    <!-- You can keep additivity="false" if you ONLY want this logger's output -->
-    <!-- and not the root logger's output for this class. -->
-    <logger name="desm.dps.PowerPlant" level="DEBUG" additivity="false">
-        <appender-ref ref="CONSOLE" />
-    </logger>
+
+
 </configuration>

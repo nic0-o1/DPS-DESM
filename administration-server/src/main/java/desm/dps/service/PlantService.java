@@ -9,6 +9,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+/**
+ * A service layer that handles business logic for power plant management.
+ * It validates data before interacting with the {@link PlantRepository}.
+ */
 @Service
 public class PlantService {
     private static final Logger logger = LoggerFactory.getLogger(PlantService.class);
@@ -20,63 +24,69 @@ public class PlantService {
         this.plantRepository = plantRepository;
     }
 
+    /**
+     * Retrieves a list of all registered power plants.
+     *
+     * @return A list of {@link PowerPlantInfo} objects.
+     */
     public List<PowerPlantInfo> getAllPlants() {
-        logger.info("Retrieving all registered plants.");
+        logger.debug("Service layer retrieving all registered plants.");
         return plantRepository.getAllPlants();
     }
 
     /**
-     * Registers a new power plant after validating its data.
-     * @param plantInfo The PowerPlantInfo object to register.
-     * @return true if the plant was successfully registered, false if data is invalid or a plant with the same ID already exists.
+     * Registers a new power plant after performing validation checks.
+     *
+     * @param plantInfo The {@link PowerPlantInfo} object to register.
+     * @return {@code true} if the plant was successfully registered; {@code false} if the data is invalid
+     *         or if a plant with the same ID already exists.
      */
     public boolean registerPlant(PowerPlantInfo plantInfo) {
-        if (plantInfo == null) {
-            logger.warn("Attempted to register a null plantInfo object.");
+        if (!isPlantInfoValid(plantInfo)) {
             return false;
         }
-        // Assuming plant IDs should be positive integers.
-        if (plantInfo.plantId() <= 0) {
-            logger.warn("Attempted to register a plant with invalid ID: {}.", plantInfo.plantId());
-            return false;
-        }
-        if (plantInfo.address() == null || plantInfo.address().trim().isEmpty()) {
-            logger.warn("Attempted to register plant ID {} with null or empty address.", plantInfo.plantId());
-            return false;
-        }
-        if (plantInfo.port() <= 0 || plantInfo.port() > 65535) { // Standard port range
-            logger.warn("Attempted to register plant ID {} with invalid port: {}.", plantInfo.plantId(), plantInfo.port());
-            return false;
-        }
-
-        logger.info("Attempting to register plant with ID: {}", plantInfo.plantId());
-        boolean success = plantRepository.registerPlant(plantInfo);
-        if (success) {
-            logger.info("Successfully registered plant: {}", plantInfo.plantId());
-        } else {
-            logger.warn("Failed to register plant: ID {} already exists or another repository issue occurred.", plantInfo.plantId());
-        }
-        return success;
+        logger.debug("Attempting to register valid plant with ID: {}", plantInfo.plantId());
+        return plantRepository.registerPlant(plantInfo);
     }
 
     /**
-     * Retrieves a power plant by its ID.
+     * Retrieves a power plant by its ID after validating the ID format.
+     *
      * @param plantId The ID of the plant to retrieve.
-     * @return The PowerPlantInfo object if found, otherwise null.
+     * @return The {@link PowerPlantInfo} object if found, otherwise {@code null}.
      */
     public PowerPlantInfo getPlantById(int plantId) {
-        // Assuming plant IDs should be positive integers.
         if (plantId <= 0) {
-            logger.warn("Attempted to retrieve plant with an invalid ID: {}", plantId);
+            logger.warn("Attempted to retrieve plant with an invalid (non-positive) ID: {}", plantId);
             return null;
         }
-        logger.info("Retrieving plant by ID: {}", plantId);
-        PowerPlantInfo plant = plantRepository.getPlantById(plantId);
-        if (plant == null) {
-            logger.info("No plant found with ID: {}", plantId);
-        } else {
-            logger.info("Found plant with ID {}: {}", plantId, plant);
+        logger.debug("Service layer retrieving plant by ID: {}", plantId);
+        return plantRepository.getPlantById(plantId);
+    }
+
+    /**
+     * Validates the fields of a {@link PowerPlantInfo} object.
+     *
+     * @param plantInfo The object to validate.
+     * @return {@code true} if all fields are valid, {@code false} otherwise.
+     */
+    private boolean isPlantInfoValid(PowerPlantInfo plantInfo) {
+        if (plantInfo == null) {
+            logger.warn("Validation failed: plantInfo object is null.");
+            return false;
         }
-        return plant;
+        if (plantInfo.plantId() <= 0) {
+            logger.warn("Validation failed: plant ID {} is not a positive integer.", plantInfo.plantId());
+            return false;
+        }
+        if (plantInfo.address() == null || plantInfo.address().trim().isEmpty()) {
+            logger.warn("Validation failed for Plant {}: address is null or empty.", plantInfo.plantId());
+            return false;
+        }
+        if (plantInfo.port() <= 0 || plantInfo.port() > 65535) {
+            logger.warn("Validation failed for Plant {}: port {} is outside the valid range (1-65535).", plantInfo.plantId(), plantInfo.port());
+            return false;
+        }
+        return true;
     }
 }

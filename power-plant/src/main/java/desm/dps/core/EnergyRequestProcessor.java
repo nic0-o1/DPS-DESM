@@ -37,8 +37,7 @@ public class EnergyRequestProcessor {
     }
 
     /**
-     * Immediately starts an election for a new energy request. This method should only be called
-     * by a coordinator (e.g., {@link desm.dps.PowerPlant}) that has already confirmed the plant is not busy.
+     * Immediately starts an election for a new energy request.
      *
      * @param energyRequest The new request to start an election for.
      */
@@ -47,8 +46,7 @@ public class EnergyRequestProcessor {
     }
 
     /**
-     * Adds an energy request to the pending queue. This method should only be called
-     * by a coordinator that has already confirmed the plant is busy.
+     * Adds an energy request to the pending queue.
      *
      * @param energyRequest The request to be queued.
      */

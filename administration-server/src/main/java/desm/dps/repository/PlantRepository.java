@@ -10,7 +10,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A thread-safe, in-memory repository for managing the registration of power plants.
+ * A thread-safe, in-memory repository for managing registered {@link PowerPlantInfo} objects.
+ * As a Spring {@link Service}, this class is instantiated as a singleton by the dependency
+ * injection container, ensuring a single, consistent source for all plant
+ *  registrations across the application.
  */
 @Service
 public class PlantRepository {
@@ -20,26 +23,29 @@ public class PlantRepository {
     private final Object lock = new Object();
 
     /**
-     * Registers a new power plant.
+     * Registers a new power plant if its ID is not already present.
+     * This operation is atomic and thread-safe.
      *
-     * @param toRegister The information of the plant to register.
+     * @param toRegister The {@link PowerPlantInfo} of the plant to register.
      * @return {@code true} if the plant was successfully registered, {@code false} if a plant with the same ID already exists.
      */
     public boolean registerPlant(PowerPlantInfo toRegister) {
         synchronized (lock) {
             if (registeredPlants.containsKey(toRegister.plantId())) {
+                logger.warn("Attempt to register a duplicate plant with ID {}. Registration denied.", toRegister.plantId());
                 return false;
             }
             registeredPlants.put(toRegister.plantId(), toRegister);
-            logger.info("Registered new plant in repository: {}", toRegister);
+            logger.info("Registered new plant (ID: {}) in repository.", toRegister.plantId());
             return true;
         }
     }
 
     /**
      * Retrieves a power plant by its unique ID.
+     * This operation is thread-safe.
      *
-     * @param plantId The ID of the plant to find.
+     * @param plantId The ID of the plant to retrieve.
      * @return The {@link PowerPlantInfo} if found, otherwise {@code null}.
      */
     public PowerPlantInfo getPlantById(int plantId) {
@@ -49,9 +55,11 @@ public class PlantRepository {
     }
 
     /**
-     * Retrieves an immutable list of all currently registered power plants.
+     * Retrieves a snapshot of all currently registered power plants.
+     * This operation is thread-safe.
      *
-     * @return An unmodifiable list of all plants.
+     * @return An unmodifiable {@link List} containing all registered plants.
+     *         Attempting to modify the returned list will result in an {@link UnsupportedOperationException}.
      */
     public List<PowerPlantInfo> getAllPlants() {
         synchronized (lock) {

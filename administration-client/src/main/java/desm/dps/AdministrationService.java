@@ -52,7 +52,6 @@ public class AdministrationService {
                     System.out.println("No power plants found.");
                 }
             } else {
-                // Handle non-200 OK responses that weren't thrown as exceptions
                 System.out.println("Server responded with status: " + response.getStatusCode());
             }
         } catch (ResourceAccessException e) {
@@ -72,9 +71,9 @@ public class AdministrationService {
      */
     public void printPollutionData(Scanner scanner) {
         System.out.println("\n===== POLLUTION DATA REQUEST =====");
-        System.out.print("Enter start timestamp (e.g., 1672531200000): ");
+        System.out.print("Enter start timestamp: ");
         String t1 = scanner.nextLine().trim();
-        System.out.print("Enter end timestamp (e.g., 1672617600000): ");
+        System.out.print("Enter end timestamp: ");
         String t2 = scanner.nextLine().trim();
 
         if (t1.isEmpty() || t2.isEmpty()) {

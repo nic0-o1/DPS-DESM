@@ -3,7 +3,7 @@ package desm.dps;
 import java.util.Scanner;
 
 /**
- * A command-line interface (CLI) client for interacting with the power plant administration system.
+ * A command-line interface client for interacting with the power plant administration system.
  * It provides a simple menu-driven interface for the user to execute various administration tasks.
  */
 public class AdministrationClientApp {
@@ -19,7 +19,7 @@ public class AdministrationClientApp {
 
     /**
      * The main entry point for the application.
-     * @param args Command line arguments (not used).
+     * @param args Command line arguments.
      */
     public static void main(String[] args) {
         new AdministrationClientApp().run();
@@ -75,10 +75,8 @@ public class AdministrationClientApp {
                 return -1; // Return an invalid choice.
             }
         } finally {
-            // IMPORTANT: Consume the rest of the line only if there is a line to consume.
-            // This prevents an error if the user enters a number and immediately closes the stream.
             if (scanner.hasNextLine()) {
-                scanner.nextLine(); // Consume the trailing newline character or the invalid token.
+                scanner.nextLine();
             }
         }
     }

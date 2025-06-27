@@ -54,7 +54,7 @@ public class PlantController {
      *         or 500 (Internal Server Error) on failure.
      */
     @PostMapping
-    public ResponseEntity<?> addPlant(@RequestBody(required = false) PowerPlantInfo plantInfo) {
+    public ResponseEntity<?> addPlant(@RequestBody PowerPlantInfo plantInfo) {
         if (plantInfo == null) {
             logger.warn("Registration request failed: request body is missing.");
             return ResponseEntity.badRequest().body("Request body (PowerPlantInfo) is missing.");

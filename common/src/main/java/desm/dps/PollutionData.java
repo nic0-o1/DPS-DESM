@@ -22,8 +22,6 @@ public record PollutionData(int plantId, long listComputationTimestamp, List<Dou
     public PollutionData(int plantId, long listComputationTimestamp, List<Double> averages) {
         this.plantId = plantId;
         this.listComputationTimestamp = listComputationTimestamp;
-        // Use List.copyOf to create a defensive, unmodifiable copy of the list,
-        // protecting the internal state of this record from external modification.
         this.averages = List.copyOf(Objects.requireNonNull(averages, "Averages list cannot be null."));
     }
 

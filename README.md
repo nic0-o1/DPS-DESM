@@ -1,7 +1,7 @@
 # DESM (Distributed Energy Supply Management)
 
 
-**Distributed and Pervasive Systems Project – University of Milan (Master’s in Computer Science)**  
+**Distributed and Pervasive Systems Project  A.A 2024 / 2025 – University of Milan (Master’s in Computer Science)**  
 
 
 ## ⚙️ Components
@@ -45,7 +45,6 @@
 - Sliding window CO₂ measurement buffer
 - Real-time pollution monitoring
 - Distributed coordination and fairness in request fulfillment
-- (Optional) Plant departure handling (controlled & uncontrolled)
 
 
 

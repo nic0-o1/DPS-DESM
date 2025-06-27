@@ -50,7 +50,6 @@ public class EnergyRequestSubscriber implements MqttCallback {
      * @throws MqttException if connecting or subscribing fails.
      */
     public void start() throws MqttException {
-        // Use a persistent file store for QoS 1 and 2 message states.
         MqttClientPersistence persistence = new MqttDefaultFilePersistence();
         mqttClient = new MqttClient(brokerUri, clientId, persistence);
 
@@ -93,7 +92,6 @@ public class EnergyRequestSubscriber implements MqttCallback {
 
     @Override
     public void connectionLost(Throwable cause) {
-        // The Paho client's automatic reconnect feature will handle reconnection attempts.
         logger.error("MQTT connection lost for client '{}'. Cause: {}", clientId, cause.getMessage(), cause);
     }
 

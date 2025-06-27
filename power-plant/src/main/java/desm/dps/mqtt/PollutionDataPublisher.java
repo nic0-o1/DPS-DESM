@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
  */
 public class PollutionDataPublisher {
     private static final Logger logger = LoggerFactory.getLogger(PollutionDataPublisher.class);
-    // QoS 2 ensures that each message is delivered exactly once.
+
     private static final int QOS_LEVEL = 2;
 
     private final String brokerUrl;
@@ -32,7 +32,7 @@ public class PollutionDataPublisher {
      */
     public PollutionDataPublisher(String brokerUrl, String clientId, String topic) {
         this.brokerUrl = brokerUrl;
-        this.clientId = clientId + "_pollution_publisher"; // Ensure unique client ID.
+        this.clientId = clientId + "_pollution_publisher";
         this.topic = topic;
     }
 

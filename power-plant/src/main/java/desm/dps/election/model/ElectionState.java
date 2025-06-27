@@ -65,8 +65,6 @@ public class ElectionState {
      * @return {@code true} if the bid is valid.
      */
     public boolean isValidBid() {
-        // myBid is only mutated under a lock, but reading a double can be non-atomic on 32-bit systems.
-        // For safety and consistency, we lock here as well.
         synchronized (stateLock) {
             return myBid >= 0;
         }

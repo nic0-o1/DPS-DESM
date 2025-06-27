@@ -22,7 +22,8 @@ public final class RingAlgorithmProcessor {
     private final ElectionCommunicator communicator;
     private final ElectionCompletionHandler localProcessor;
 
-    public RingAlgorithmProcessor(PowerPlant powerPlant, ElectionCommunicator communicator, ElectionCompletionHandler localProcessor) {
+    public RingAlgorithmProcessor(PowerPlant powerPlant, ElectionCommunicator communicator,
+                                  ElectionCompletionHandler localProcessor) {
         this.powerPlant = powerPlant;
         this.communicator = communicator;
         this.localProcessor = localProcessor;
@@ -40,7 +41,6 @@ public final class RingAlgorithmProcessor {
         int selfId = powerPlant.getSelfInfo().plantId();
         Bid myBid = createBid(selfId, state.getMyBid());
 
-        // Atomically update the best bid to our own.
         state.updateBestBid(myBid);
 
         if (state.getBestBid().getPlantId() != selfId) {
@@ -52,7 +52,7 @@ public final class RingAlgorithmProcessor {
         ElectCoordinatorToken token = createToken(selfId, state, state.getBestBid());
         PowerPlantInfo nextPlant = powerPlant.getNextPlantInRing(selfId);
 
-        // If there's no next plant or we are the only one, complete the election immediately.
+        // If there's no next plant, or we are the only one, complete the election immediately.
         if (nextPlant == null || nextPlant.plantId() == selfId) {
             logger.info("Initiating and completing election for ER {} locally (single node case).", state.getRequest().requestID());
             complete(state, token);
@@ -78,7 +78,6 @@ public final class RingAlgorithmProcessor {
 
         if (nextPlantInRing == null) {
             logger.warn("Cannot forward token for ER '{}'; no next plant found in ring.", incomingToken.getEnergyRequestId());
-            // The election will stall here until the ring topology is fixed.
             return;
         }
 

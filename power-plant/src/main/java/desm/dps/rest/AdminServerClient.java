@@ -28,7 +28,7 @@ public final class AdminServerClient {
     /**
      * Constructs a client for the admin server.
      *
-     * @param baseUrl The base URL of the admin server (e.g., "http://localhost:8080"). Must not be null.
+     * @param baseUrl The base URL of the admin server. Must not be null.
      */
     public AdminServerClient(String baseUrl) {
         this.baseUrl = Objects.requireNonNull(baseUrl, "Admin server base URL cannot be null");

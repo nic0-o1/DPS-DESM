@@ -32,8 +32,6 @@ public class PowerPlant {
     private final PlantRegistry plantRegistry;
     private final EnergyRequestProcessor energyRequestProcessor;
     private final ServiceManager serviceManager;
-    private final ElectionManager electionManager;
-    private final PollutionMonitor pollutionMonitor;
 
     private volatile boolean isShutdown = false;
 
@@ -47,10 +45,12 @@ public class PowerPlant {
         this.config = AppConfig.getInstance();
 
         this.plantRegistry = new PlantRegistry(selfInfo);
+
         PlantGrpcClient grpcClient = new PlantGrpcClient(this);
-        this.electionManager = new ElectionManager(this, grpcClient);
-        this.energyRequestProcessor = new EnergyRequestProcessor(selfInfo.plantId(), this.electionManager);
-        this.pollutionMonitor = new PollutionMonitor(selfInfo, mqttBrokerUrl, pollutionPublishTopic);
+        ElectionManager electionManager = new ElectionManager(this, grpcClient);
+        PollutionMonitor pollutionMonitor = new PollutionMonitor(selfInfo, mqttBrokerUrl, pollutionPublishTopic);
+
+        this.energyRequestProcessor = new EnergyRequestProcessor(selfInfo.plantId(), electionManager);
 
         this.serviceManager = new ServiceManager(this, selfInfo, grpcClient, electionManager, pollutionMonitor,
                 mqttBrokerUrl, energyRequestTopic);

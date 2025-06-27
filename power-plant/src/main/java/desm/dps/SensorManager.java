@@ -66,7 +66,6 @@ public class SensorManager extends Thread {
                     }
                 }
             }
-            // A short sleep can be added here if CPU usage is a concern, e.g., Thread.sleep(10)
         }
 
         shutdownSensor();

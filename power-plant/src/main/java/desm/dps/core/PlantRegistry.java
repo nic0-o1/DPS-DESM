@@ -103,7 +103,7 @@ public class PlantRegistry {
             // Double-checked locking: re-read the cache in case another thread built it while we waited for the lock.
             ring = this.cachedRingArray;
             if (ring == null) {
-                logger.info("Rebuilding sorted plant ring cache...");
+                logger.debug("Rebuilding sorted plant ring cache...");
                 ring = buildCompleteRing();
                 this.cachedRingArray = ring;
             }

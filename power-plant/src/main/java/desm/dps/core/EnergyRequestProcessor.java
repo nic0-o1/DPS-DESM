@@ -16,7 +16,7 @@ import java.util.Objects;
  */
 public class EnergyRequestProcessor {
     private static final Logger logger = LoggerFactory.getLogger(EnergyRequestProcessor.class);
-    private static final int PRODUCTION_MULTIPLIER = 1;
+    private static final int PRODUCTION_MULTIPLIER = 7;
 
     private final int selfPlantId;
     private final ElectionManager electionManager;

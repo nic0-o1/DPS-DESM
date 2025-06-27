@@ -58,7 +58,7 @@ public class RenewableProvider {
                     logger.debug("Publishing energy request: {}", request);
                     requestPublisher.publishRequest(request);
                     logger.info("Successfully published energy request");
-
+                    running = false;
                     Thread.sleep(PUBLISH_INTERVAL_MS);
 
 

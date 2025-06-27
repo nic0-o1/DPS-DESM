@@ -46,7 +46,6 @@ public class PlantGrpcClient {
 	private PlantCommunicationServiceBlockingStub getBlockingStub(PowerPlantInfo targetPlant) {
 		int targetId = targetPlant.plantId();
 		synchronized (stubsLock) {
-			// Check-then-act is safe here because the entire block is synchronized.
 			if (!blockingStubs.containsKey(targetId)) {
 				logger.info("Creating new gRPC client stub for Plant {} at {}:{}",
 						targetPlant.plantId(), targetPlant.address(), targetPlant.port());
@@ -133,7 +132,6 @@ public class PlantGrpcClient {
 
 	/**
 	 * Shuts down all active gRPC channels and clears connection caches.
-	 * This method should be called during a graceful application shutdown.
 	 */
 	public void shutdown() {
 		ArrayList<ManagedChannel> channelsToShutDown;

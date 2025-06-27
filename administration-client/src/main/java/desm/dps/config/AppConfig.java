@@ -23,10 +23,8 @@ public class AppConfig {
      */
     private AppConfig() {
         properties = new Properties();
-        // Use try-with-resources to ensure the InputStream is closed automatically
         try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(CONFIG_FILE)) {
             if (inputStream == null) {
-                // Thrown if the properties file is not on the classpath
                 throw new IOException("Configuration file '" + CONFIG_FILE + "' not found in the classpath.");
             }
             properties.load(inputStream);

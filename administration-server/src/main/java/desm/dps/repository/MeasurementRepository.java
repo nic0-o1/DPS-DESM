@@ -3,8 +3,6 @@ package desm.dps.repository;
 import desm.dps.PollutionData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.config.ConfigurableBeanFactory;
-import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -15,7 +13,6 @@ import java.util.List;
  * This class acts as a singleton data store for all pollution data received from power plants.
  */
 @Service
-@Scope(ConfigurableBeanFactory.SCOPE_SINGLETON)
 public class MeasurementRepository {
     private static final Logger logger = LoggerFactory.getLogger(MeasurementRepository.class);
 

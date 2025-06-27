@@ -26,13 +26,15 @@ public class PlantRegistry {
     }
 
     /**
-     * Adds a list of newly discovered plants from the admin server.
+     * Populates the registry with an initial list of plants, for instance, from an admin server.
+     * Skips this plant's own info and any duplicates. This operation is thread-safe.
      *
      * @param initialPlants The list of plants to add.
      */
     public void addInitialPlants(List<PowerPlantInfo> initialPlants) {
         synchronized (lock) {
             for (PowerPlantInfo plant : initialPlants) {
+                // Ensure we don't add ourselves or an existing plant.
                 if (plant.plantId() != selfInfo.plantId() && !plantExistsUnsafe(plant.plantId())) {
                     otherPlantsList.add(plant);
                 }
@@ -43,6 +45,7 @@ public class PlantRegistry {
 
     /**
      * Adds a single new plant to the registry if it's not already present.
+     * This operation is thread-safe and invalidates the ring cache.
      *
      * @param newPlant The plant to add.
      */
@@ -62,6 +65,7 @@ public class PlantRegistry {
 
     /**
      * Removes a plant from the registry by its ID.
+     * This operation is thread-safe and invalidates the ring cache.
      *
      * @param plantId The ID of the plant to remove.
      */
@@ -75,25 +79,31 @@ public class PlantRegistry {
     }
 
     /**
-     * Gets the next plant in the logical ring, which is sorted by plant ID.
-     * This method is highly optimized for reads using a lock-free cache.
+     * Gets the next plant in the logical ring. The ring is sorted by registration time.
+     * This method is highly optimized for reads using a lock-free "fast path" that relies on a volatile cache.
+     * A lock is only acquired if the cache needs to be rebuilt.
      *
-     * @param currentPlantId The ID of the plant from which to find the next one.
-     *                       Using Integer allows for a null value to represent an initial state.
+     * @param currentPlantId The ID of the plant from which to find the next one. If null, returns this plant's own info.
      * @return The {@link PowerPlantInfo} of the next plant in the ring.
      */
     public PowerPlantInfo getNextInRing(Integer currentPlantId) {
         if (currentPlantId == null) {
             return selfInfo;
         }
+        // Fast path: Read the volatile cache. No lock is acquired if the cache is valid.
         PowerPlantInfo[] ring = this.cachedRingArray;
         if (ring != null) {
             PowerPlantInfo next = findNextInArray(ring, currentPlantId);
-            if (next != null) return next;
+            if (next != null) {
+                return next;
+            }
         }
+        // Slow path: Acquire lock to check and potentially rebuild the cache.
         synchronized (lock) {
+            // Double-checked locking: re-read the cache in case another thread built it while we waited for the lock.
             ring = this.cachedRingArray;
             if (ring == null) {
+                logger.info("Rebuilding sorted plant ring cache...");
                 ring = buildCompleteRing();
                 this.cachedRingArray = ring;
             }
@@ -102,9 +112,9 @@ public class PlantRegistry {
     }
 
     /**
-     * Returns a thread-safe snapshot of the current list of other plants.
+     * Returns a thread-safe snapshot of the current list of other known plants.
      *
-     * @return A new list containing the other known plants.
+     * @return A new {@link ArrayList} containing the other known plants.
      */
     public List<PowerPlantInfo> getOtherPlantsSnapshot() {
         synchronized (lock) {
@@ -113,8 +123,9 @@ public class PlantRegistry {
     }
 
     /**
-     * Gets the count of other known plants.
-     * @return The number of other plants in the registry.
+     * Gets the count of other known plants in the registry.
+     *
+     * @return The number of other plants.
      */
     public int getOtherPlantsCount() {
         synchronized (lock) {
@@ -124,23 +135,37 @@ public class PlantRegistry {
 
     // --- Unsafe helpers ---
 
+    /**
+     * Checks if a plant exists. This is an internal helper and must be called from within a synchronized block.
+     */
     private boolean plantExistsUnsafe(int plantId) {
         return otherPlantsList.stream().anyMatch(p -> p.plantId() == plantId);
     }
 
+    /**
+     * Sorts the list of other plants and invalidates the cache.
+     * This is an internal helper and must be called from within a synchronized block.
+     */
     private void sortAndInvalidateCache() {
         otherPlantsList.sort(Comparator.comparing(PowerPlantInfo::registrationTime));
         this.cachedRingArray = null; // Invalidate cache on any modification
     }
 
+    /**
+     * Builds the complete, sorted ring including this plant.
+     * This is an internal helper and must be called from within a synchronized block.
+     */
     private PowerPlantInfo[] buildCompleteRing() {
         List<PowerPlantInfo> allPlants = new ArrayList<>(otherPlantsList.size() + 1);
         allPlants.addAll(otherPlantsList);
         allPlants.add(selfInfo);
-        allPlants.sort(Comparator.comparing(PowerPlantInfo::plantId));
+        allPlants.sort(Comparator.comparing(PowerPlantInfo::registrationTime));
         return allPlants.toArray(new PowerPlantInfo[0]);
     }
 
+    /**
+     * Finds the next plant in a given array representing the ring.
+     */
     private PowerPlantInfo findNextInArray(PowerPlantInfo[] ring, int currentPlantId) {
         for (int i = 0; i < ring.length; i++) {
             if (ring[i].plantId() == currentPlantId) {
